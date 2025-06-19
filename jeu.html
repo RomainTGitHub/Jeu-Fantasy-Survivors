@@ -820,7 +820,8 @@
             }
         }
         const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!e.isDead){killEnemy(e);}}});}}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
+    }
     // Updates projectiles
     function updateProjectiles(){
         for(let pI=projectiles.length-1;pI>=0;pI--){
@@ -962,7 +963,7 @@
         // Triangle pointing right
         ctx.moveTo(mmDef.drawW / 2, 0); // Tip of the triangle
         ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2); // Bottom-left
-        ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2); // Bottom-right
+        ctx.lineTo(-mmF.drawW / 2, mmF.drawH / 2); // Bottom-right
         ctx.closePath();
         ctx.fill();
         ctx.restore();
