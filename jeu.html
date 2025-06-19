@@ -247,11 +247,11 @@
     Votre navigateur ne supporte pas l'élément audio.
 </audio>
 
-<!-- Audio element for magic missile sound -->
-<audio id="magic-missile-sound">
-    <source src="soundeffect/magicprojectilesound.mp3" type="audio/mpeg">
-    Votre navigateur ne supporte pas l'élément audio.
-</audio>
+<!-- Removed: Audio element for magic missile sound, now created dynamically -->
+<!-- <audio id="magic-missile-sound">
+    <source src="sounds/magic_missile.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+</audio> -->
 
 <!-- Sound controls -->
 <div id="sound-controls">
@@ -273,7 +273,7 @@
 
     // New: Audio elements
     const backgroundMusic = document.getElementById('background-music');
-    const magicMissileSound = document.getElementById('magic-missile-sound'); // Reference to the new audio element
+    // Removed: const magicMissileSound = document.getElementById('magic-missile-sound'); // Reference to the new audio element
     let toggleMusicButton; // Will be assigned in init
     let toggleSfxButton;   // Will be assigned in init
 
@@ -295,7 +295,7 @@
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
         // magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Removed: not using sprite for magic missile
-        magicMissileSound: 'sounds/magic_missile.mp3' // Added magic missile sound
+        magicMissileSound: 'soundeffect/magicprojectile.mp3' // Added magic missile sound path
     };
 
     // Loads all images defined in assetSources
@@ -868,8 +868,9 @@
 
                 // Play magic missile sound effect
                 if (areSoundEffectsOn) {
-                    magicMissileSound.currentTime = 0; // Rewind to start
-                    magicMissileSound.play().catch(error => {
+                    // Create a new Audio object each time a sound effect is played
+                    const newMagicMissileSound = new Audio(assetSources.magicMissileSound);
+                    newMagicMissileSound.play().catch(error => {
                         console.warn("Autoplay of magic missile sound was prevented:", error);
                     });
                 }
@@ -1024,8 +1025,8 @@
             ctx.fillStyle = '#00FFFF'; // Same color as the main missile
             ctx.beginPath();
             ctx.moveTo(mmDef.drawW / 2, 0);
-            ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2);
-            ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2);
+            ctx.lineTo(-mm.drawW / 2, -mm.drawH / 2);
+            ctx.lineTo(-mm.drawW / 2, mm.drawH / 2);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
@@ -1552,8 +1553,8 @@
         } else {
             toggleSfxButton.textContent = "Effets Sonores: OFF";
             // If any sound effect is currently playing, stop it.
-            magicMissileSound.pause();
-            magicMissileSound.currentTime = 0; // Rewind for next play
+            // Note: Since we're creating new Audio instances, there's no single magicMissileSound to stop here.
+            // If you had many looping SFX, you might manage them in an array to stop them all.
         }
     }
 
