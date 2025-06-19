@@ -338,7 +338,15 @@
     function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
     
     // Adjusts canvas size based on game container
-    function resizeCanvas(){canvas.width=gameContainer.clientWidth;canvas.height=gameContainer.clientHeight;}
+    function resizeCanvas() {
+        canvas.width = gameContainer.clientWidth;
+        canvas.height = gameContainer.clientHeight;
+        // Optionally, recalculate camera position or other elements that depend on canvas size
+        camera.x = player.x - canvas.width / 2;
+        camera.y = player.y - canvas.height / 2;
+        // Redraw immediately after resize to prevent flicker or empty canvas
+        draw(); 
+    }
     
     // Handles key press and release events
     document.addEventListener('keydown', (e) => { 
@@ -707,7 +715,10 @@
         drawDebugGallery();
         return; // Stops normal game drawing
     }
-        camera.x=player.x-canvas.width/2;camera.y=player.y-canvas.height/2;
+        // Update camera position based on current canvas size
+        camera.x = player.x - canvas.width / 2;
+        camera.y = player.y - canvas.height / 2;
+
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.save();
         ctx.translate(-camera.x,-camera.y);
@@ -954,6 +965,8 @@
 
         // Resizes canvas and creates obstacles
         resizeCanvas();
+        // Add event listener for window resize to adjust canvas size
+        window.addEventListener('resize', resizeCanvas);
         createBackgroundAndObstacles();
 
         // Loads assets and starts game loop once everything is loaded
