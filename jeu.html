@@ -186,7 +186,7 @@
             top: 20px;
             right: 20px;
             z-index: 30; /* Ensure it's above everything */
-            display: flex; /* Use flexbox to arrange buttons */
+            display: none; /* Hidden by default, shown only in main menu */
             flex-direction: column; /* Stack buttons vertically */
             gap: 10px; /* Space between buttons */
         }
@@ -299,6 +299,12 @@
             <button onclick="window.location.reload()">Recommencer</button>
         </div>
     </div>
+
+    <!-- Sound controls moved inside game-container -->
+    <div id="sound-controls">
+        <button id="toggle-music-button">Musique: ON</button>
+        <button id="toggle-sfx-button">Effets Sonores: ON</button>
+    </div>
 </div>
 
 <!-- Audio element for background music -->
@@ -306,12 +312,6 @@
     <source src="music/mainmenumusic.mp3" type="audio/mpeg">
     Votre navigateur ne supporte pas l'élément audio.
 </audio>
-
-<!-- Sound controls -->
-<div id="sound-controls">
-    <button id="toggle-music-button">Musique: ON</button>
-    <button id="toggle-sfx-button">Effets Sonores: ON</button>
-</div>
 
 <script>
     // No Firebase imports needed for localStorage persistence
@@ -330,6 +330,7 @@
     // Removed: const magicMissileSound = document.getElementById('magic-missile-sound'); // Reference to the new audio element
     let toggleMusicButton; // Will be assigned in init
     let toggleSfxButton;   // Will be assigned in init
+    let soundControlsUI; // Reference to the sound controls container
 
     // Options menu elements
     let optionsModal;
@@ -358,7 +359,7 @@
         background: 'images/background.png',
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
-        magicMissileSound: 'sounds/magic_missile.mp3' // Added magic missile sound path
+        magicMissileSound: 'soundeffect/magicprojectile.mp3' // Added magic missile sound path
     };
 
     // Loads all images defined in assetSources
@@ -1376,6 +1377,7 @@
     function startGame() {
         mainMenu.style.display = 'none'; // Hides main menu
         mainMenuGoldUI.style.display = 'none'; // Explicitly hide gold in main menu
+        soundControlsUI.style.display = 'none'; // Hide sound controls when game starts
 
         // Ensure any previous game loop is stopped before starting a new one
         if (animationFrameId) {
@@ -1412,6 +1414,7 @@
         gameState.paused = true;
         pauseModal.style.display = 'flex';
         populatePauseStats(); // Updates stats in pause menu
+        soundControlsUI.style.display = 'none'; // Ensure sound controls are hidden during pause
         // Music is no longer paused here to keep it playing during pause.
     }
 
@@ -1456,6 +1459,7 @@
         pauseModal.style.display = 'none';
         mainMenu.style.display = 'flex';
         mainMenuGoldUI.style.display = 'block'; // Make gold display visible again
+        soundControlsUI.style.display = 'flex'; // Show sound controls when returning to main menu
         updateMainMenuGoldDisplay(); // Ensure main menu gold display is updated (this will now show the reloaded gold)
 
 
@@ -1568,6 +1572,10 @@
             if (toggleMusicButton) toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
             if (toggleSfxButton) toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
 
+            // On initial load, if main menu is visible, show sound controls
+            if (mainMenu.style.display !== 'none') {
+                soundControlsUI.style.display = 'flex';
+            }
 
         } catch (error) {
             console.error("Erreur lors du chargement de l'or du joueur et des paramètres audio depuis localStorage :", error);
@@ -1661,9 +1669,10 @@
     function showOptions(fromMenu) {
         returnToMenuAfterOptions = fromMenu;
         optionsModal.style.display = 'flex';
-        // Hide other menus
+        // Hide other menus and sound controls
         mainMenu.style.display = 'none';
         pauseModal.style.display = 'none';
+        soundControlsUI.style.display = 'none';
         // Set slider values to current volumes
         musicVolumeSlider.value = backgroundMusic.volume;
         sfxVolumeSlider.value = sfxVolume;
@@ -1681,8 +1690,10 @@
         optionsModal.style.display = 'none';
         if (returnToMenuAfterOptions === 'main') {
             mainMenu.style.display = 'flex';
+            soundControlsUI.style.display = 'flex'; // Show sound controls again
         } else if (returnToMenuAfterOptions === 'pause') {
             pauseModal.style.display = 'flex';
+            soundControlsUI.style.display = 'none'; // Keep sound controls hidden
         }
         savePlayerGold(); // Save volume settings when closing options
     }
@@ -1753,6 +1764,7 @@
         // Get references to toggle buttons
         toggleMusicButton = document.getElementById('toggle-music-button');
         toggleSfxButton = document.getElementById('toggle-sfx-button');
+        soundControlsUI = document.getElementById('sound-controls'); // Get reference to sound controls container
 
         // Get references to options modal elements
         optionsModal = document.getElementById('options-modal');
