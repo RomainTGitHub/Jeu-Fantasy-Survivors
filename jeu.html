@@ -1062,8 +1062,8 @@
             type: 'magicMissile',
             trail: [],
             maxTrailLength: mmDef.maxTrailLength,
-            trailOpacityStart: mmDef.trailOpacityStart,
-            trailOpacityEnd: mmDef.trailOpacityEnd,
+            trailOpacityStart: 0.8, // Opacity for the newest trail point
+            trailOpacityEnd: 0.1, // Opacity for the oldest trail point
         };
         // Populate dummy trail for visual effect
         for(let i = 0; i < sampleProjectile.maxTrailLength; i++) {
@@ -1429,11 +1429,13 @@
     function quitGame() {
         savePlayerGold(); // Save the current gold before quitting
 
-        console.log("Player state BEFORE reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
+        console.log("Player state BEFORE reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level, gold: player.gold }));
 
-        resetPlayerState(); // Reset player state to its initial definition
+        resetPlayerState(); // Reset player state to its initial definition (sets gold to 0)
 
-        console.log("Player state AFTER reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
+        loadPlayerGold(); // Reload gold from localStorage immediately after reset
+
+        console.log("Player state AFTER reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level, gold: player.gold }));
 
 
         // Clear all game entities
@@ -1453,7 +1455,9 @@
         // Hide pause modal and show main menu
         pauseModal.style.display = 'none';
         mainMenu.style.display = 'flex';
-        updateMainMenuGoldDisplay(); // Ensure main menu gold display is updated
+        mainMenuGoldUI.style.display = 'block'; // Make gold display visible again
+        updateMainMenuGoldDisplay(); // Ensure main menu gold display is updated (this will now show the reloaded gold)
+
 
         if (animationFrameId) { // Stop the game loop if it's running
             cancelAnimationFrame(animationFrameId);
