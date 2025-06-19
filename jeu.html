@@ -180,6 +180,23 @@
             text-shadow: 2px 2px 2px #000;
             margin-top: 20px;
         }
+        /* Styles for sound controls */
+        #sound-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 30; /* Ensure it's above everything */
+        }
+        #sound-controls button {
+            background-color: #f1c40f;
+            color: #1a1a1a;
+            border: none;
+            padding: 10px 15px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -208,7 +225,7 @@
             </div>
             <button onclick="resumeGame()">Reprendre</button>
             <!-- Nouveau bouton pour quitter la partie -->
-            <button onclick="quitGame()">Quitter la partie</button> 
+            <button onclick="quitGame()">Quitter la partie</button>
         </div>
     </div>
     <!-- Victory Screen -->
@@ -220,6 +237,18 @@
         </div>
     </div>
 </div>
+
+<!-- Audio element for background music -->
+<audio id="background-music" loop>
+    <source src="music/mainmenumusic.mp3" type="audio/mpeg">
+    Votre navigateur ne supporte pas l'élément audio.
+</audio>
+
+<!-- Sound controls -->
+<div id="sound-controls">
+    <button id="toggle-music-button">Musique: ON</button>
+</div>
+
 <script>
     // No Firebase imports needed for localStorage persistence
     // Global variables for game state and UI elements
@@ -231,6 +260,10 @@
     const pauseModal = document.getElementById('pause-modal'); // Reference to the pause menu
     const victoryModal = document.getElementById('victory-modal'); // Reference to the victory modal
     let mainMenuGoldUI; // Reference to the gold display on main menu
+
+    // New: Audio elements
+    const backgroundMusic = document.getElementById('background-music');
+    const toggleMusicButton = document.getElementById('toggle-music-button');
 
     // --- Asset Loading ---
     const assets = {};
@@ -301,19 +334,33 @@
     let projectiles = [], enemies = [], xpGems = [], goldCoins = []; // New goldCoins array
     let enemySpawnTimer = 0;
 
-    // Player properties (added visualOffsetX and visualOffsetY)
-    const player = {
-        x:world.width/2,y:world.height/2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
-        visualOffsetX: 0, visualOffsetY: -10, // New offsets for visual rendering
-        speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100, gold: 0, // Added gold property
-        regenerationRate: 0, // New: health points per second to regenerate
-        invincible: false, // New: player invincibility state
-        invincibilityEndTime: 0, // New: invincibility end time
-        anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},
-        weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},
-        aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},
-        auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},
+    // Initial player properties to be used for resetting
+    const initialPlayerState = {
+        x: world.width / 2, y: world.height / 2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
+        visualOffsetX: 0, visualOffsetY: -10,
+        speed: 4, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // Gold will be loaded from localStorage separately
+        regenerationRate: 0,
+        invincible: false,
+        invincibilityEndTime: 0,
+        anim: { frame: 0, timer: 0, speed: 15, isMoving: false, facingRight: true },
+        frameCount: 4, // Added frameCount to initialPlayerState
+        weapons: {
+            magicMissile: { level: 1, cooldown: 1200, lastShot: 0, damage: 12 },
+            aura: { level: 0, radius: 80, damage: 5, cooldown: 100, lastTick: 0, orbCount: 0, rotation: 0 },
+            auraOfDecay: { level: 0, radius: 120, damage: 2, cooldown: 500, lastTick: 0 }
+        },
     };
+
+    // Player properties (will be modified during game)
+    let player; // Changed from const to let
+
+    // Function to reset player state to initial values
+    function resetPlayerState() {
+        // Deep copy of initialPlayerState to ensure all nested objects are also reset
+        player = JSON.parse(JSON.stringify(initialPlayerState));
+        // Gold needs to be handled separately as it's persistent, loaded by loadPlayerGold()
+    }
+
     // Enemy definitions (added visualOffsetX and visualOffsetY)
     const enemyDefinitions={
         goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
@@ -337,7 +384,6 @@
         }
     };
 
-    player.frameCount = 4; // Number of frames for player animation
     // Available upgrades when leveling up
     const availableUpgrades=[
         {
@@ -366,7 +412,7 @@
 
     // Creates the background and obstacles of the world
     function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
-    
+
     // Adjusts canvas size based on game container
     function resizeCanvas() {
         canvas.width = gameContainer.clientWidth;
@@ -375,20 +421,21 @@
         camera.x = player.x - canvas.width / 2;
         camera.y = player.y - canvas.height / 2;
         // Redraw immediately after resize to prevent flicker or empty canvas
-        draw(); 
+        draw();
     }
-    
+
     // Handles key press and release events
-    document.addEventListener('keydown', (e) => { 
+    document.addEventListener('keydown', (e) => {
         // Removed: if (!gameState.gameStarted) { startGame(); return; } // Game starts only by button click
-        keys[e.key.toLowerCase()] = true; 
+        keys[e.key.toLowerCase()] = true;
 
         if (e.key.toLowerCase() === 'escape') { // Handles Escape key for pause
             console.log('Escape key pressed.');
             console.log('Current gameState.paused:', gameState.paused);
             if (gameState.running && !debugGalleryMode) { // Do not pause if game is already over or in debug gallery mode
+                // Invert the logic: if paused, resume; if not paused, pause.
                 if (gameState.paused) {
-                    pauseGame();
+                    resumeGame();
                 } else {
                     pauseGame();
                 }
@@ -396,7 +443,7 @@
                 console.log('Pause blocked: gameState.running:', gameState.running, 'debugGalleryMode:', debugGalleryMode);
             }
         }
-        
+
         if (e.key.toLowerCase() === 'h') {
             debugMode = !debugMode; // Toggles debug mode
             // No longer force debugGalleryMode to false
@@ -423,23 +470,23 @@
     function checkCollision(r1,r2){return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;}
     // Checks collision of a rectangle with a list of objects
     function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
-    
+
     // Updates player position and animation
     function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nextPos = getHitbox(player);nextPos.x += mx;if(!checkCollisionWithObjects(nextPos,obstacles))player.x+=mx;nextPos.x-=mx;nextPos.y+=my;if(!checkCollisionWithObjects(nextPos,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
     // Spawns enemies
     function spawnEnemies(){
         if(gameState.paused)return;
-        
+
         // Adjusts time between each enemy wave (longer at first)
         const initialSpawnDelay = 2000; // ms
         const minSpawnDelay = 300; // ms
         const spawnDelayReductionRate = 0.01; // ms reduction per ms of gameTime (slows down game hardening)
         const currentSpawnDelay = Math.max(minSpawnDelay, initialSpawnDelay - gameState.gameTime * spawnDelayReductionRate);
-        
+
         enemySpawnTimer -= 16; // Decreases timer by 16ms (approx. one frame time)
         if(enemySpawnTimer <= 0){
             enemySpawnTimer = currentSpawnDelay; // Resets timer with new difficulty value
-            
+
             // Adjusts number of enemies per wave (lower at first)
             const initialEnemiesPerSpawn = 1;
             const enemyIncreaseRate = 1 / 90000; // 1 additional enemy every 90 seconds
@@ -453,11 +500,11 @@
                     const d=Math.max(canvas.width/2,canvas.height/2)+50; // Distance from player
                     x=player.x+Math.cos(an)*d;
                     y=player.y+Math.sin(an)*d;
-                    
+
                     // Uses new logic to get enemy type
                     const tK=getEnemyTypeByTime();
                     const t=enemyDefinitions[tK];
-                    
+
                     sR={x,y,w:t.w,h:t.h,hitboxOffsetX:t.hitboxOffsetX,hitboxOffsetY:t.hitboxOffsetY};
                     if(!checkCollisionWithObjects(getHitbox(sR),obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){
                         ok=true;
@@ -648,9 +695,9 @@
     function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
     // Selects an upgrade
     function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
-    
+
     // Handles damage taken by the player
-    function takeDamage(amount){ 
+    function takeDamage(amount){
         const now = Date.now();
         // If player is currently invincible, do not take damage
         if (player.invincible && now < player.invincibilityEndTime) {
@@ -658,7 +705,7 @@
         }
 
         player.health-=amount;
-        
+
         // Activates invincibility after taking damage
         player.invincible = true;
         player.invincibilityEndTime = now + 1000; // Invincible for 1 second (1000 ms)
@@ -691,14 +738,30 @@
         finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;
         gameOverModal.style.display='flex';
         savePlayerGold(); // Save gold on game over
+        if (animationFrameId) { // Ensure loop is stopped
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            console.log(`Game Over: Animation frame ${animationFrameId} cancelled.`);
+        }
+        // Stop music on game over
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0; // Rewind music
     }
-    
+
     // Victory function
     async function gameVictory() {
         gameState.running = false;
         victoryModal.style.display = 'flex';
         // You can add victory-specific information here, like final time
         savePlayerGold(); // Save gold on victory
+        if (animationFrameId) { // Ensure loop is stopped
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            console.log(`Victory: Animation frame ${animationFrameId} cancelled.`);
+        }
+        // Stop music on victory
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0; // Rewind music
     }
 
     // Function to check if an enemy is visible on screen
@@ -708,9 +771,9 @@
 
         // Checks if enemy's bounding box (using sprite dimensions for visibility)
         // overlaps with canvas bounding box (0,0,canvas.width,canvas.height)
-        return enemyScreenX < canvas.width && 
+        return enemyScreenX < canvas.width &&
                enemyScreenX + enemy.spriteW > 0 &&
-               enemyScreenY < canvas.height && 
+               enemyScreenY < canvas.height &&
                enemyScreenY + enemy.spriteH > 0;
     }
 
@@ -724,7 +787,7 @@
         enemies.forEach(e=>{
             // Calculate enemy distance from player
             const distanceToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
-            
+
             // Only consider visible enemies AND within range for magic missile targeting
             if (isEnemyVisible(e) && distanceToPlayer <= missileRange) {
                 if(distanceToPlayer < minDistance){
@@ -755,7 +818,7 @@
         killCountUI.textContent=`Kills: ${gameState.killCount}`;
         healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;
         xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;
-        
+
         // Update text content for health and XP bars
         healthTextUI.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
         xpTextUI.textContent = `${Math.floor(player.xp)}/${player.xpToNextLevel}`;
@@ -767,7 +830,7 @@
         const mm=player.weapons.magicMissile;
         if(mm.level>0 && now-mm.lastShot > mm.cooldown){
             const target=findNearestEnemy(); // findNearestEnemy already checks visibility and range
-            if(target){ 
+            if(target){
                 mm.lastShot=now;
                 const dx=target.x-player.x;
                 const dy=target.y-player.y;
@@ -776,7 +839,7 @@
                 // Projectile speed is 8px per frame (assuming 60fps, but calculating based on distance).
                 // Distance = range (canvas.width / 2) / projectile_speed_per_frame
                 // If speed is 8, and range is say 600px (for a 1200px canvas), then 600/8 = 75 frames.
-                
+
                 // Use projectileDefinitions for magicMissile
                 const mmDef = projectileDefinitions.magicMissile;
                 projectiles.push({
@@ -852,15 +915,15 @@
         ctx.fillText("Player", x, y - 10);
         if (assets.player && assets.player.complete) {
             const sprite = assets.player;
-            const frameWidth = sprite.naturalWidth / player.frameCount;
+            const frameWidth = sprite.naturalWidth / initialPlayerState.frameCount; // Use initialPlayerState.frameCount
             const frameHeight = sprite.naturalHeight;
             // Apply visualOffsetX and visualOffsetY here
-            ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + player.visualOffsetX, y + player.visualOffsetY, player.spriteW, player.spriteH);
+            ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + initialPlayerState.visualOffsetX, y + initialPlayerState.visualOffsetY, initialPlayerState.spriteW, initialPlayerState.spriteH); // Use initialPlayerState
             if (debugMode) { // Draw hitbox if debugMode is true
                 ctx.strokeStyle = 'rgba(255,0,0,0.8)';
                 ctx.lineWidth = 2;
                 // Hitbox remains at its logical position (x, y) + existing offsets
-                ctx.strokeRect(x + player.hitboxOffsetX, y + player.hitboxOffsetY, player.w, player.h);
+                ctx.strokeRect(x + initialPlayerState.hitboxOffsetX, y + initialPlayerState.hitboxOffsetY, initialPlayerState.w, initialPlayerState.h); // Use initialPlayerState
             }
         }
         x += spacing;
@@ -893,7 +956,7 @@
         const mmDef = projectileDefinitions.magicMissile;
 
         // Create a dummy projectile for trail visualization
-        const sampleProjectile = { 
+        const sampleProjectile = {
             x: x + mmDef.drawW / 2, y: y + mmDef.drawH / 2,
             w: mmDef.drawW, h: mmDef.drawH,
             angle: 0, // Assume 0 angle for gallery
@@ -926,7 +989,7 @@
 
             ctx.fillStyle = '#00FFFF'; // Same color as the main missile
             ctx.beginPath();
-            ctx.moveTo(mmDef.drawW / 2, 0); 
+            ctx.moveTo(mmDef.drawW / 2, 0);
             ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2);
             ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2);
             ctx.closePath();
@@ -983,7 +1046,7 @@
         }
 
         // Draws obstacles with texture
-        obstacles.forEach(o => { 
+        obstacles.forEach(o => {
             if(assets.obstacle && assets.obstacle.complete) {
                 // Draw the obstacle image, scaling it to fit the obstacle's dimensions
                 ctx.drawImage(assets.obstacle, o.x, o.y, o.w, o.h);
@@ -997,16 +1060,16 @@
                 ctx.strokeRect(o.x, o.y, o.w, o.h);
             }
         });
-        
+
         // Draws XP gems (with visualOffsetX/Y)
-        xpGems.forEach(gem => { 
+        xpGems.forEach(gem => {
             if(assets.xpGem && assets.xpGem.complete && assets.xpGem.naturalHeight !== 0) {
                 const sprite = assets.xpGem;
                 const frameWidth = sprite.naturalWidth / gem.frameCount;
                 const frameHeight = sprite.naturalHeight;
                 const sourceX = gem.anim.frame * frameWidth;
                 // Apply visualOffsetX and visualOffsetY here
-                ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16 + gem.visualOffsetX, gem.y - 16 + gem.visualOffsetY, 32, 32); 
+                ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16 + gem.visualOffsetX, gem.y - 16 + gem.visualOffsetY, 32, 32);
             }
         });
 
@@ -1020,7 +1083,7 @@
                 ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, coin.x - 16 + coin.visualOffsetX, coin.y - 16 + coin.visualOffsetY, 32, 32);
             }
         });
-        
+
         // Draws enemies and their health bars (with visualOffsetX/Y)
         enemies.forEach(e => {
             if(assets[e.type]) {
@@ -1042,15 +1105,15 @@
             // Draws enemy health bar (its position is linked to hitbox, not visual offset)
             if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
         });
-    
+
         // Draws player with horizontal flip if necessary (with visualOffsetX/Y)
         ctx.save();
         // Calculates base sprite position (before visual offset)
         const currentSpriteX = player.x - (player.spriteW - player.w) / 2 + player.hitboxOffsetX;
-        const currentSpriteY = player.y - (player.spriteH - player.h) / 2 + player.hitboxOffsetY;
+        const currentSpriteY = player.y - (player.h - player.h) / 2 + player.hitboxOffsetY;
 
         // Applies translation for rotation/flip, including visual offset
-        ctx.translate(currentSpriteX + player.visualOffsetX + player.spriteW / 2, currentSpriteY + player.visualOffsetY + player.spriteH / 2);
+        ctx.translate(currentSpriteX + player.visualOffsetX + player.spriteW / 2, currentSpriteY + player.visualOffsetY + player.h / 2);
         if (!player.anim.facingRight) { ctx.scale(-1, 1); }
         if(assets.player && assets.player.complete && assets.player.naturalHeight !== 0) {
             const sprite = assets.player;
@@ -1061,11 +1124,11 @@
             if (player.invincible && Date.now() % 200 < 100) { // Blinks every 100ms
                 ctx.globalAlpha = 0.5; // Makes player semi-transparent
             }
-            ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.spriteH / 2, player.spriteW, player.spriteH);
+            ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.h / 2, player.spriteW, player.h);
             ctx.globalAlpha = 1.0; // Resets opacity
         }
         ctx.restore();
-        
+
         // Draws player hitbox in debug mode (its position is logical, without visual offset)
         if(debugMode) {
             ctx.strokeStyle = 'rgba(255,0,0,0.5)';
@@ -1110,7 +1173,7 @@
 
                     ctx.fillStyle = '#00FFFF'; // Same color as the main missile
                     ctx.beginPath();
-                    ctx.moveTo(p.w / 2, 0); 
+                    ctx.moveTo(p.w / 2, 0);
                     ctx.lineTo(-p.w / 2, -p.h / 2);
                     ctx.lineTo(-p.w / 2, p.h / 2);
                     ctx.closePath();
@@ -1148,11 +1211,13 @@
 
         // Draws aura orbs
         const aura=player.weapons.aura;if(aura.level>0){const orbW=24,orbH=24;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
-        
+
         ctx.restore();
     }
 
     let lastTime = 0;
+    let animationFrameId = null; // Global variable to hold the animation frame ID
+
     // Function to update player regeneration
     function updatePlayerRegeneration(deltaTime) {
         if (player.regenerationRate > 0) {
@@ -1160,7 +1225,7 @@
             const safeDeltaTime = Math.max(0, deltaTime);
             // deltaTime is in milliseconds, regenerationRate is in HP per second
             const healthToRegen = (player.regenerationRate * safeDeltaTime) / 1000;
-            
+
             // Regeneration adds health. Math.min ensures not exceeding max health.
             player.health = Math.min(player.maxHealth, player.health + healthToRegen);
         }
@@ -1168,13 +1233,21 @@
 
     // Main game loop
     function gameLoop(timestamp){
-        if(!gameState.running) {
-            requestAnimationFrame(gameLoop); // Continues drawing main menu or pause
+        console.log(`gameLoop: running=${gameState.running}, paused=${gameState.paused}, debugGalleryMode=${debugGalleryMode}, animationFrameId=${animationFrameId}`);
+
+        // If the game is not running, stop scheduling new frames
+        if (!gameState.running) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            console.log(`gameLoop: Stopping animation frame because gameState.running is false.`);
             return;
         }
+
         const deltaTime=timestamp-lastTime;
-        lastTime=timestamp;
+        lastTime=timestamp; // Always update lastTime for the next frame's delta calculation
+
         if(!gameState.paused && !debugGalleryMode){
+            console.log(`gameLoop: Game logic active. deltaTime: ${deltaTime.toFixed(2)}ms`);
             updatePlayer();
             spawnEnemies();
             updateEnemies();
@@ -1192,21 +1265,44 @@
                 gameVictory();
                 return; // Stops processing game logic after victory
             }
+        } else {
+            console.log(`gameLoop: Game logic paused or in debug gallery mode. paused: ${gameState.paused}, debugGalleryMode: ${debugGalleryMode}`);
         }
         draw();
         updateUI();
-        requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop); // Schedule next frame
     }
-    
+
     // Function to start the game
     function startGame() {
         mainMenu.style.display = 'none'; // Hides main menu
         mainMenuGoldUI.style.display = 'none'; // Explicitly hide gold in main menu
+
+        // Ensure any previous game loop is stopped before starting a new one
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            console.log(`startGame: Existing animation frame ${animationFrameId} cancelled.`);
+        }
+
         gameState.gameStarted = true;
         gameState.running = true;
         gameState.paused = false;
-        lastTime = performance.now(); // Resets time for a clean game loop start
-        requestAnimationFrame(gameLoop); // Starts game loop
+        lastTime = performance.now(); // Critical: Reset lastTime here for the *first* frame of a new game.
+
+        console.log("Player state AT START of new game:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
+
+        // Start background music when game starts
+        backgroundMusic.play().catch(error => {
+            console.warn("Autoplay was prevented. User must interact with the document first.", error);
+            // Show a message to the user that they need to click to enable sound
+            // Or handle it by toggling sound on first user interaction
+        });
+        toggleMusicButton.textContent = "Musique: ON"; // Update button text
+
+
+        animationFrameId = requestAnimationFrame(gameLoop); // Starts game loop
+        console.log(`startGame: New animation frame requested, ID: ${animationFrameId}`);
     }
 
     // Function to pause the game
@@ -1215,32 +1311,29 @@
         gameState.paused = true;
         pauseModal.style.display = 'flex';
         populatePauseStats(); // Updates stats in pause menu
+        // Removed: backgroundMusic.pause();
     }
 
     // Function to resume the game
     function resumeGame() {
         console.log('resumeGame() called. Setting pauseModal display to none.');
         gameState.paused = false;
-        pauseModal.style.display = 'none';
+        pauseModal.style.display = 'none'; // FERME LE MENU PAUSE
         lastTime = performance.now(); // Resets time to avoid large deltaTime after pause
+        console.log('resumeGame: lastTime reset for smooth resumption.');
+        // Removed: if (backgroundMusic.paused === false) { backgroundMusic.play().catch(error => { console.warn("Autoplay was prevented on resume. User must interact.", error); }); }
     }
 
     // Function to quit the game and return to main menu
     function quitGame() {
         savePlayerGold(); // Save the current gold before quitting
 
-        // Reset player stats (except gold, which is persistent)
-        player.health = player.maxHealth;
-        player.xp = 0;
-        player.level = 1;
-        player.xpToNextLevel = 8;
-        player.regenerationRate = 0;
-        player.invincible = false;
-        player.invincibilityEndTime = 0;
-        player.speed = 4; // Reset speed to initial value
-        player.weapons.magicMissile = {level:1,cooldown:1200,lastShot:0,damage:12};
-        player.weapons.aura = {level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0};
-        player.weapons.auraOfDecay = {level:0,radius:120,damage:2,cooldown:500,lastTick:0};
+        console.log("Player state BEFORE reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
+
+        resetPlayerState(); // Reset player state to its initial definition
+
+        console.log("Player state AFTER reset:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
+
 
         // Clear all game entities
         enemies = [];
@@ -1260,6 +1353,16 @@
         pauseModal.style.display = 'none';
         mainMenu.style.display = 'flex';
         updateMainMenuGoldDisplay(); // Ensure main menu gold display is updated
+
+        if (animationFrameId) { // Stop the game loop if it's running
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            console.log(`quitGame: Animation frame ${animationFrameId} cancelled.`);
+        }
+        // Stop music and rewind when quitting to main menu
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        toggleMusicButton.textContent = "Musique: OFF"; // Set button text to OFF
     }
 
     // Function to populate pause menu statistics
@@ -1281,14 +1384,16 @@
         }
 
         // Collects other stat boosts
-        if (player.maxHealth > 120) {
-            currentUpgrades.maxHealth = (player.maxHealth - 120) / 20; // Number of times upgraded
+        // Note: The logic here depends on how upgrades are applied.
+        // If upgrades are additive, you'd calculate based on initialPlayerState.
+        if (player.maxHealth > initialPlayerState.maxHealth) {
+            currentUpgrades.maxHealth = (player.maxHealth - initialPlayerState.maxHealth) / 20; // Number of times upgraded
         }
-        if (player.speed > 4) {
-            currentUpgrades.speed = (player.speed - 4) / 0.5; // Number of times upgraded
+        if (player.speed > initialPlayerState.speed) {
+            currentUpgrades.speed = (player.speed - initialPlayerState.speed) / 0.5; // Number of times upgraded
         }
-        if (player.regenerationRate > 0) {
-            currentUpgrades.regeneration = player.regenerationRate / 0.5; // Number of times upgraded
+        if (player.regenerationRate > initialPlayerState.regenerationRate) {
+            currentUpgrades.regeneration = (player.regenerationRate - initialPlayerState.regenerationRate) / 0.5; // Number of times upgraded
         }
 
         // Maps upgrade IDs to display names and logic
@@ -1310,9 +1415,9 @@
             if (upgradeId === 'regeneration') {
                 li.textContent = `${displayName}: +${player.regenerationRate.toFixed(1)} PV/sec`;
             } else if (upgradeId === 'maxHealth') {
-                li.textContent = `${displayName}: +${player.maxHealth - 120} Vie Max`;
+                li.textContent = `${displayName}: +${player.maxHealth - initialPlayerState.maxHealth} Vie Max`;
             } else if (upgradeId === 'speed') {
-                li.textContent = `${displayName}: +${(player.speed - 4).toFixed(1)} Vitesse`; // Use toFixed for speed
+                li.textContent = `${displayName}: +${(player.speed - initialPlayerState.speed).toFixed(1)} Vitesse`; // Use toFixed for speed
             } else {
                 li.textContent = `${displayName}: Niveau ${level}`;
             }
@@ -1355,6 +1460,44 @@
         }
     }
 
+    // Function to toggle background music
+    function toggleMusic() {
+        if (backgroundMusic.paused) {
+            backgroundMusic.play().catch(error => {
+                console.warn("Autoplay was prevented. User must interact with the document first.", error);
+                // Utiliser une boîte de message personnalisée au lieu de alert()
+                const customAlert = document.createElement('div');
+                customAlert.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background-color: #2c2c2c;
+                    padding: 20px;
+                    border: 4px solid #f1c40f;
+                    border-radius: 10px;
+                    text-align: center;
+                    z-index: 9999;
+                    font-family: 'Press Start 2P', cursive;
+                    color: #fff;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+                `;
+                customAlert.innerHTML = `
+                    <p>Cliquez n'importe où sur l'écran pour activer le son.</p>
+                    <button style="background-color: #f1c40f; color: #1a1a1a; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer; font-family: 'Press Start 2P', cursive;">OK</button>
+                `;
+                document.body.appendChild(customAlert);
+                customAlert.querySelector('button').onclick = () => {
+                    document.body.removeChild(customAlert);
+                };
+            });
+            toggleMusicButton.textContent = "Musique: ON";
+        } else {
+            backgroundMusic.pause();
+            toggleMusicButton.textContent = "Musique: OFF";
+        }
+    }
+
     // Game initialization function
     function init(){
         // Initializes user interface
@@ -1377,7 +1520,10 @@
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
-        
+
+        // Call resetPlayerState before getting references to UI elements that display player stats
+        resetPlayerState(); // Reset player state at the very beginning
+
         // Get references to UI elements
         levelUI=document.getElementById('level');
         timerUI=document.getElementById('timer');
@@ -1409,8 +1555,8 @@
         loadAssets(() => {
             backgroundPattern = ctx.createPattern(assets.background, 'repeat');
             // Call loadPlayerGold after assets are loaded and UI elements are available
-            loadPlayerGold(); 
-            draw(); 
+            loadPlayerGold();
+            draw();
         });
     }
 
@@ -1424,6 +1570,15 @@
             console.log("Le bouton 'Améliorations' a été cliqué.");
             // Future functionality for upgrades menu goes here
             // For now, it just logs to the console.
+        });
+        // Add event listener for the toggle music button
+        toggleMusicButton.addEventListener('click', toggleMusic);
+
+        // Try to autoplay music on page load, if allowed by browser
+        backgroundMusic.play().catch(error => {
+            console.log("Autoplay of background music was prevented. User interaction required.");
+            toggleMusicButton.textContent = "Musique: OFF"; // Reflect current state
+            // It's a good practice to indicate to the user why music might not be playing
         });
     });
 </script>
