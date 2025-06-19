@@ -169,47 +169,10 @@
             margin-bottom: 40px;
             text-shadow: 4px 4px 0px #e67e22;
         }
-        #main-menu p {
-            font-size: 24px;
-            color: #fff;
-            margin-top: 20px;
-            animation: pulse 1.5s infinite alternate; /* Animation de pulsation */
-        }
-        @keyframes pulse {
-            from { transform: scale(1); opacity: 1; }
-            to { transform: scale(1.05); opacity: 0.8; }
-        }
-
-        /* Styles spécifiques au menu pause */
-        #pause-stats p {
-            font-size: 18px;
-            margin: 10px 0;
-            text-align: left; /* Aligner le texte à gauche pour les statistiques */
-            width: 100%; /* S'assurer que le paragraphe prend toute la largeur */
-        }
-        #pause-stats {
-            margin-bottom: 20px;
-            width: 100%;
-            padding: 0 20px; /* Ajout d'un peu de padding pour les statistiques */
-            box-sizing: border-box; /* Inclure le padding dans la largeur */
-        }
-        #pause-upgrades {
-            text-align: left;
-            width: 100%;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
-        #pause-upgrades h3 {
-            font-size: 20px;
-            color: #f1c40f;
-            margin-bottom: 10px;
-        }
-        #pause-upgrades ul {
-            list-style: none;
-            padding: 0;
-        }
-        #pause-upgrades li {
-            margin-bottom: 5px;
+        /* Adjusted margin-top for buttons in main menu */
+        #main-menu button {
+            margin-top: 15px; /* Smaller margin between buttons */
+            margin-bottom: 5px; /* Add some space below each button */
         }
     </style>
 </head>
@@ -220,7 +183,8 @@
     <!-- Main Menu -->
     <div id="main-menu">
         <h1>Fantasy Survivors</h1>
-        <p>APPUYEZ SUR N'IMPORTE QUELLE TOUCHE POUR COMMENCER</p>
+        <button id="startGameButton">Jouer !</button>
+        <button id="upgradesMenuButton">Améliorations</button>
     </div>
     <!-- Pause Menu -->
     <div id="pause-modal" class="modal">
@@ -404,10 +368,7 @@
     
     // Handles key press and release events
     document.addEventListener('keydown', (e) => { 
-        if (!gameState.gameStarted) { // If game hasn't started, any key starts it
-            startGame();
-            return; // Exit function to avoid processing key for movement
-        }
+        // Removed: if (!gameState.gameStarted) { startGame(); return; } // Game starts only by button click
         keys[e.key.toLowerCase()] = true; 
 
         if (e.key.toLowerCase() === 'escape') { // Handles Escape key for pause
@@ -963,7 +924,7 @@
         // Triangle pointing right
         ctx.moveTo(mmDef.drawW / 2, 0); // Tip of the triangle
         ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2); // Bottom-left
-        ctx.lineTo(-mmF.drawW / 2, mmF.drawH / 2); // Bottom-right
+        ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2); // Bottom-right
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -1364,6 +1325,16 @@
 
     // Calls initialization function to start the game
     init();
+
+    // Add event listeners for the new buttons after init()
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('startGameButton').addEventListener('click', startGame);
+        document.getElementById('upgradesMenuButton').addEventListener('click', () => {
+            console.log("Le bouton 'Améliorations' a été cliqué.");
+            // Future functionality for upgrades menu goes here
+            // For now, it just logs to the console.
+        });
+    });
 </script>
 </body>
 </html>
