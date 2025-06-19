@@ -262,7 +262,7 @@
         background: 'images/background.png',
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
-        magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Placeholder for Magic Missile sprite
+        // magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Removed: not using sprite for magic missile
     };
 
     // Loads all images defined in assetSources
@@ -346,15 +346,11 @@
     // Projectile definitions (new for animated projectiles)
     const projectileDefinitions = {
         magicMissile: {
-            spriteAsset: 'magicMissileSprite', // Key in assets object
-            spriteW: 16, // Width of a single frame in the spritesheet
-            spriteH: 16, // Height of a single frame in the spritesheet
             drawW: 32, // Desired drawing width on canvas
             drawH: 32, // Desired drawing height on canvas
-            frameCount: 4, // Number of frames in the spritesheet
-            animSpeed: 5, // Animation speed (lower is faster)
-            visualOffsetX: -16, // Adjust visual offset for drawing to center (drawW / 2)
-            visualOffsetY: -16, // Adjust visual offset for drawing to center (drawH / 2)
+            maxTrailLength: 10, // Max number of trail points
+            trailOpacityStart: 0.8, // Opacity for the newest trail point
+            trailOpacityEnd: 0.1, // Opacity for the oldest trail point
         }
     };
 
@@ -412,7 +408,7 @@
             console.log('Current gameState.paused:', gameState.paused);
             if (gameState.running && !debugGalleryMode) { // Do not pause if game is already over or in debug gallery mode
                 if (gameState.paused) {
-                    resumeGame();
+                    pauseGame();
                 } else {
                     pauseGame();
                 }
@@ -787,13 +783,11 @@
                     lifespan: Math.ceil((canvas.width / 2) / 8),
                     angle:angle,
                     type: 'magicMissile', // Type of projectile to draw correctly
-                    anim: { frame: 0, timer: 0, speed: mmDef.animSpeed },
-                    frameCount: mmDef.frameCount,
-                    spriteAsset: mmDef.spriteAsset,
-                    spriteW: mmDef.spriteW,
-                    spriteH: mmDef.spriteH,
-                    visualOffsetX: mmDef.visualOffsetX,
-                    visualOffsetY: mmDef.visualOffsetY
+                    // Initialize trail for the new missile
+                    trail: [],
+                    maxTrailLength: mmDef.maxTrailLength,
+                    trailOpacityStart: mmDef.trailOpacityStart,
+                    trailOpacityEnd: mmDef.trailOpacityEnd,
                 });
             }
         }
@@ -803,16 +797,18 @@
     function updateProjectiles(){
         for(let pI=projectiles.length-1;pI>=0;pI--){
             const p=projectiles[pI];
+
+            // Add current position to trail before updating main projectile position
+            if (p.type === 'magicMissile') {
+                p.trail.unshift({ x: p.x, y: p.y, angle: p.angle }); // Add to front
+                if (p.trail.length > p.maxTrailLength) {
+                    p.trail.pop(); // Remove from back
+                }
+            }
+
             p.x+=p.vx;
             p.y+=p.vy;
             p.lifespan--;
-
-            // Update animation frame for projectiles
-            p.anim.timer++;
-            if (p.anim.timer > p.anim.speed) {
-                p.anim.timer = 0;
-                p.anim.frame = (p.anim.frame + 1) % p.frameCount;
-            }
 
             if(p.lifespan<=0){
                 projectiles.splice(pI,1);
@@ -887,18 +883,68 @@
         // Draw Projectile (Magic Missile) in debug gallery
         ctx.fillText("Magic Missile", x, y - 10);
         const mmDef = projectileDefinitions.magicMissile;
-        if (assets[mmDef.spriteAsset] && assets[mmDef.spriteAsset].complete) {
-            const sprite = assets[mmDef.spriteAsset];
-            const frameWidth = sprite.naturalWidth / mmDef.frameCount; // Correct frame width based on spritesheet
-            const frameHeight = sprite.naturalHeight; // Correct frame height based on spritesheet
-            // Apply visualOffsetX and visualOffsetY here for centering within the debug gallery cell
-            ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + mmDef.visualOffsetX, y + mmDef.visualOffsetY, mmDef.drawW, mmDef.drawH);
-            if (debugMode) {
-                ctx.strokeStyle = 'rgba(255,0,0,0.8)';
-                ctx.lineWidth = 2;
-                // The hitbox should match drawW and drawH, centered around the visual offsets
-                ctx.strokeRect(x, y, mmDef.drawW, mmDef.drawH); // Hitbox for projectile
-            }
+
+        // Draw trail elements in debug gallery
+        const sampleProjectile = { // Create a dummy projectile for trail visualization
+            x: x + mmDef.drawW / 2, y: y + mmDef.drawH / 2,
+            w: mmDef.drawW, h: mmDef.drawH,
+            angle: 0, // Assume 0 angle for gallery
+            type: 'magicMissile',
+            trail: [],
+            maxTrailLength: mmDef.maxTrailLength,
+            trailOpacityStart: mmDef.trailOpacityStart,
+            trailOpacityEnd: mmDef.trailOpacityEnd,
+        };
+        // Populate dummy trail for visual effect
+        for(let i = 0; i < sampleProjectile.maxTrailLength; i++) {
+            // Shift left for trail effect, making it appear behind
+            sampleProjectile.trail.push({
+                x: x + mmDef.drawW / 2 - i * (mmDef.drawW / sampleProjectile.maxTrailLength),
+                y: y + mmDef.drawH / 2,
+                angle: 0
+            });
+        }
+
+
+        // Draw trail (newest to oldest, decreasing opacity)
+        sampleProjectile.trail.forEach((trailPoint, index) => {
+            ctx.save();
+            // Calculate opacity based on position in trail
+            const alpha = sampleProjectile.trailOpacityStart - (index / (sampleProjectile.maxTrailLength - 1)) * (sampleProjectile.trailOpacityStart - sampleProjectile.trailOpacityEnd);
+            ctx.globalAlpha = Math.max(0, alpha); // Ensure alpha doesn't go below 0
+
+            ctx.translate(trailPoint.x, trailPoint.y + 50); // Offset down for clear view
+            ctx.rotate(trailPoint.angle);
+
+            ctx.fillStyle = '#00FFFF'; // Same color as the main missile
+            ctx.beginPath();
+            ctx.moveTo(mmDef.drawW / 2, 0); 
+            ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2);
+            ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        });
+        ctx.globalAlpha = 1.0; // Reset globalAlpha after drawing trail
+
+        ctx.save();
+        ctx.translate(x + mmDef.drawW / 2, y + mmDef.drawH / 2); // Translate to center of drawing area for rotation
+        ctx.fillStyle = '#00FFFF'; // Magic Missile color (cyan for debugging)
+        ctx.beginPath();
+        // Triangle pointing right
+        ctx.moveTo(mmDef.drawW / 2, 0); // Tip of the triangle
+        ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2); // Bottom-left
+        ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2); // Bottom-right
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillText(`Rendered (w,h): ${mmDef.drawW}x${mmDef.drawH}`, x, y + mmDef.drawH + 15);
+
+        if (debugMode) {
+            ctx.strokeStyle = 'rgba(255,0,0,0.8)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, mmDef.drawW, mmDef.drawH);
         }
         x += spacing;
         if (x + spacing > canvas.width) {
@@ -1021,40 +1067,74 @@
         }
 
         // Draws decay aura
-        const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();;}
+        const aod=player.weapons.auraOfDecay;
+        if(aod.level>0){
+            ctx.beginPath();
+            const pulse=aod.radius+(Math.sin(Date.now()/200)*5);
+            const centerX = player.x + player.w / 2;
+            const centerY = player.y + player.h / 2;
+
+            // Crée un dégradé radial (mauve au centre, noir transparent à l'extérieur)
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, // Cercle intérieur (centre, rayon 0)
+                                                      centerX, centerY, pulse); // Cercle extérieur (centre, rayon = pulsation)
+
+            // Ajoute des arrêts de couleur
+            gradient.addColorStop(0, 'rgba(80, 0, 80, 0.6)'); // Mauve plus foncé au centre
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');  // Noir transparent au bord
+
+            ctx.fillStyle = gradient;
+            ctx.arc(centerX, centerY, pulse, 0, Math.PI * 2);
+            ctx.fill();
+        }
         // Draws projectiles
         projectiles.forEach(p=>{
-            // Check if projectile has a sprite asset defined
-            if (p.type === 'magicMissile' && assets[p.spriteAsset] && assets[p.spriteAsset].complete && assets[p.spriteAsset].naturalHeight !== 0) {
-                const sprite = assets[p.spriteAsset];
-                const frameWidth = sprite.naturalWidth / p.frameCount; // Correct frame width based on spritesheet
-                const frameHeight = sprite.naturalHeight; // Correct frame height based on spritesheet
-                const sourceX = p.anim.frame * frameWidth;
+            // Draw a triangle for Magic Missile
+            if (p.type === 'magicMissile') {
+                // Draw trail (newest to oldest, decreasing opacity)
+                p.trail.forEach((trailPoint, index) => {
+                    ctx.save();
+                    // Calculate opacity based on position in trail
+                    const alpha = p.trailOpacityStart - (index / (p.maxTrailLength - 1)) * (p.trailOpacityStart - p.trailOpacityEnd);
+                    ctx.globalAlpha = Math.max(0, alpha); // Ensure alpha doesn't go below 0
+
+                    ctx.translate(trailPoint.x, trailPoint.y);
+                    ctx.rotate(trailPoint.angle);
+
+                    ctx.fillStyle = '#00FFFF'; // Same color as the main missile
+                    ctx.beginPath();
+                    ctx.moveTo(p.w / 2, 0); 
+                    ctx.lineTo(-p.w / 2, -p.h / 2);
+                    ctx.lineTo(-p.w / 2, p.h / 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
+                ctx.globalAlpha = 1.0; // Reset globalAlpha after drawing trail
 
                 ctx.save();
-                // Translate to the center of the projectile for rotation
-                ctx.translate(p.x + p.w / 2, p.y + p.h / 2); 
-                ctx.rotate(p.angle); // Rotate based on projectile angle
+                ctx.translate(p.x, p.y); // Move to the center of the projectile
+                ctx.rotate(p.angle);    // Rotate by its angle
 
-                // Draw the sprite, applying visual offsets to draw it centered around the new origin (0,0)
-                ctx.drawImage(sprite, 
-                              sourceX, 0, frameWidth, frameHeight, 
-                              p.visualOffsetX, p.visualOffsetY, // Drawing at visual offsets
-                              p.drawW, p.drawH);
-                
+                ctx.fillStyle = '#00FFFF'; // Magic Missile color (CYAN)
+                ctx.beginPath();
+                ctx.moveTo(p.w / 2, 0); // Tip of the triangle (pointing right)
+                ctx.lineTo(-p.w / 2, -p.h / 2); // Bottom-left
+                ctx.lineTo(-p.w / 2, p.h / 2); // Bottom-right
+                ctx.closePath();
+                ctx.fill();
                 ctx.restore();
-
-                if(debugMode) { // Draw hitbox in debug mode (unrotated)
-                    ctx.strokeStyle = 'rgba(255,255,0,0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(p.x, p.y, p.w, p.h);
-                }
             } else {
-                // Fallback to old drawing if no sprite or not loaded
+                // Fallback for other projectile types if any (currently none)
                 ctx.fillStyle='#9b59b6';
                 ctx.beginPath();
                 ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);
                 ctx.fill();
+            }
+
+            if(debugMode) { // Draw hitbox in debug mode (unrotated)
+                ctx.strokeStyle = 'rgba(255,255,0,0.8)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h);
             }
         });
 
