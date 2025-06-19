@@ -207,6 +207,8 @@
                 <ul id="pause-upgrades-list"></ul>
             </div>
             <button onclick="resumeGame()">Reprendre</button>
+            <!-- Nouveau bouton pour quitter la partie -->
+            <button onclick="quitGame()">Quitter la partie</button> 
         </div>
     </div>
     <!-- Victory Screen -->
@@ -1221,6 +1223,43 @@
         gameState.paused = false;
         pauseModal.style.display = 'none';
         lastTime = performance.now(); // Resets time to avoid large deltaTime after pause
+    }
+
+    // Function to quit the game and return to main menu
+    function quitGame() {
+        savePlayerGold(); // Save the current gold before quitting
+
+        // Reset player stats (except gold, which is persistent)
+        player.health = player.maxHealth;
+        player.xp = 0;
+        player.level = 1;
+        player.xpToNextLevel = 8;
+        player.regenerationRate = 0;
+        player.invincible = false;
+        player.invincibilityEndTime = 0;
+        player.speed = 4; // Reset speed to initial value
+        player.weapons.magicMissile = {level:1,cooldown:1200,lastShot:0,damage:12};
+        player.weapons.aura = {level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0};
+        player.weapons.auraOfDecay = {level:0,radius:120,damage:2,cooldown:500,lastTick:0};
+
+        // Clear all game entities
+        enemies = [];
+        projectiles = [];
+        xpGems = [];
+        goldCoins = [];
+        enemySpawnTimer = 0;
+
+        // Reset game state
+        gameState.running = false;
+        gameState.paused = true;
+        gameState.gameTime = 0;
+        gameState.killCount = 0;
+        gameState.gameStarted = false;
+
+        // Hide pause modal and show main menu
+        pauseModal.style.display = 'none';
+        mainMenu.style.display = 'flex';
+        updateMainMenuGoldDisplay(); // Ensure main menu gold display is updated
     }
 
     // Function to populate pause menu statistics
