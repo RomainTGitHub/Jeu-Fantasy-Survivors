@@ -85,6 +85,17 @@
             pointer-events: none; /* Ensure it doesn't block clicks */
             z-index: 1; /* Ensure it's above the bar but below other UI */
         }
+        /* Style for gold display */
+        #gold-display {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 16px;
+            color: #f1c40f;
+            text-shadow: 2px 2px 2px #000;
+            pointer-events: none;
+            z-index: 5;
+        }
 
         .modal {
             position: absolute;
@@ -247,8 +258,9 @@
         slime: 'images/slime_spritesheet.png',
         orc: 'images/orc_spritesheet.png',
         xpGem: 'images/xpGem_spritesheet.png',
-        background: 'images/background.png',
-        obstacle: 'images/obstacles.png' // New obstacle image (placeholder for now)
+        background: 'images/background.jpg',
+        obstacle: 'images/obstacles.png',
+        gold: 'images/gold_spritesheet.png' // New gold spritesheet
     };
 
     // Loads all images defined in assetSources
@@ -288,7 +300,7 @@
     const world = { width: 3000, height: 3000 };
     let obstacles = [], backgroundPattern;
     // User interface elements
-    let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI, healthTextUI, xpTextUI, // Added healthTextUI, xpTextUI
+    let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI, healthTextUI, xpTextUI, goldUI, // Added goldUI
         levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
         pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // New UI elements for pause
     // Game state
@@ -301,14 +313,14 @@
     // Game camera
     let camera = { x: 0, y: 0 };
     // Game entities
-    let projectiles = [], enemies = [], xpGems = [];
+    let projectiles = [], enemies = [], xpGems = [], goldCoins = []; // New goldCoins array
     let enemySpawnTimer = 0;
 
     // Player properties (added visualOffsetX and visualOffsetY)
     const player = {
         x:world.width/2,y:world.height/2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
         visualOffsetX: 0, visualOffsetY: -10, // New offsets for visual rendering
-        speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,
+        speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100, gold: 0, // Added gold property
         regenerationRate: 0, // New: health points per second to regenerate
         invincible: false, // New: player invincibility state
         invincibilityEndTime: 0, // New: invincibility end time
@@ -324,8 +336,11 @@
         slime:{type:'slime',w:40,h:30,spriteW:100,spriteH:80, hitboxOffsetX: 30, hitboxOffsetY: 30, visualOffsetX: 0, visualOffsetY: 0, speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
         orc:{type:'orc',w:50,h:110,spriteW:128,spriteH:160, hitboxOffsetX: 35, hitboxOffsetY: 22, visualOffsetX: 0, visualOffsetY: 0, speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
     };
-    // Object definitions (e.g., XP gems) (added visualOffsetX and visualOffsetY)
-    const itemDefinitions = {xpGem: { frameCount: 7, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 },};
+    // Object definitions (e.g., XP gems, gold)
+    const itemDefinitions = {
+        xpGem: { frameCount: 7, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 },
+        gold: { frameCount: 6, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 } // Gold coin definition
+    };
     player.frameCount = 4; // Number of frames for player animation
     // Available upgrades when leveling up
     const availableUpgrades=[
@@ -391,10 +406,12 @@
         
         if (e.key.toLowerCase() === 'h') {
             debugMode = !debugMode; // Toggles debug mode
+            // No longer force debugGalleryMode to false
         }
         if (e.key.toLowerCase() === 'g') {
             debugGalleryMode = !debugGalleryMode; // Toggles debug gallery mode
             uiContainer.style.display = debugGalleryMode ? 'none' : 'block';
+            // No longer force debugMode to false
         }
     });
     document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
@@ -516,23 +533,55 @@
     }
     // Handles enemy death
     function killEnemy(enemy){
-    enemy.isDead=true;
-    gameState.killCount++;
-    if(Math.random()<0.8){ // 80% chance to spawn an XP gem
-        const gemInfo = itemDefinitions.xpGem;
-        xpGems.push({
-            x:enemy.x+enemy.w/2,
-            y:enemy.y+enemy.h/2,
-            value:enemy.xp,
-            anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
-            frameCount: gemInfo.frameCount,
-            visualOffsetX: gemInfo.visualOffsetX, // Copies visual offset
-            visualOffsetY: gemInfo.visualOffsetY,  // Copies visual offset
-            expirationTime: Date.now() + 30000 // Gem disappears after 30 seconds (30000 ms)
-        });
+        enemy.isDead=true;
+        gameState.killCount++;
+        if(Math.random()<0.8){ // 80% chance to spawn an XP gem
+            const gemInfo = itemDefinitions.xpGem;
+            xpGems.push({
+                x:enemy.x+enemy.w/2,
+                y:enemy.y+enemy.h/2,
+                value:enemy.xp,
+                anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
+                frameCount: gemInfo.frameCount,
+                visualOffsetX: gemInfo.visualOffsetX, // Copies visual offset
+                visualOffsetY: gemInfo.visualOffsetY,  // Copies visual offset
+                expirationTime: Date.now() + 30000 // Gem disappears after 30 seconds (30000 ms)
+            });
+        }
+
+        // New gold drop logic
+        let dropChance = 0;
+        switch (enemy.type) {
+            case 'goblin':
+                dropChance = 0.10; // 10%
+                break;
+            case 'skeleton':
+                dropChance = 0.12; // 12%
+                break;
+            case 'slime':
+                dropChance = 0.14; // 14%
+                break;
+            case 'orc':
+                dropChance = 0.15; // 15%
+                break;
+        }
+
+        if (Math.random() < dropChance) {
+            const goldInfo = itemDefinitions.gold;
+            goldCoins.push({
+                x: enemy.x + enemy.w / 2,
+                y: enemy.y + enemy.h / 2,
+                value: 1, // Value of gold coin
+                anim: { frame: 0, timer: 0, speed: goldInfo.animSpeed },
+                frameCount: goldInfo.frameCount,
+                visualOffsetX: goldInfo.visualOffsetX,
+                visualOffsetY: goldInfo.visualOffsetY,
+                expirationTime: Date.now() + 60000 // Gold disappears after 60 seconds (60000 ms)
+            });
+        }
+
+        enemies=enemies.filter(en=>en!==enemy);
     }
-    enemies=enemies.filter(en=>en!==enemy);
-}
     // Updates XP gems (animation, magnetism, collection, expiration)
     function updateXPGems() {
         const now = Date.now();
@@ -563,6 +612,41 @@
             }
         }
     }
+
+    // Updates Gold coins (animation, magnetism, collection, expiration)
+    function updateGoldCoins() {
+        const now = Date.now();
+        for (let i = goldCoins.length - 1; i >= 0; i--) {
+            const coin = goldCoins[i];
+
+            // Check coin expiration
+            if (now >= coin.expirationTime) {
+                goldCoins.splice(i, 1);
+                continue; // Move to next coin
+            }
+
+            coin.anim.timer++;
+            if (coin.anim.timer > coin.anim.speed) {
+                coin.anim.timer = 0;
+                coin.anim.frame = (coin.anim.frame + 1) % coin.frameCount;
+            }
+
+            const dx = (player.x + player.w / 2) - coin.x;
+            const dy = (player.y + player.h / 2) - coin.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+
+            if (d < player.magnetRadius) {
+                coin.x += (dx / d) * 6;
+                coin.y += (dy / d) * 6;
+            }
+
+            if (d < player.w / 2) { // Player collects coin
+                player.gold += coin.value;
+                goldCoins.splice(i, 1);
+            }
+        }
+    }
+
     // Collects XP and checks if player levels up
     function collectXP(amount){player.xp+=amount;if(player.xp>=player.xpToNextLevel){levelUp();}}
     // Handles player leveling up
@@ -655,6 +739,7 @@
         // Update text content for health and XP bars
         healthTextUI.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
         xpTextUI.textContent = `${Math.floor(player.xp)}/${player.xpToNextLevel}`;
+        goldUI.textContent = player.gold; // Update gold count
     }
     // Updates player weapons
     function updateWeapons(){
@@ -675,7 +760,7 @@
             }
         }
         const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dx);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
     // Updates projectiles
     function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,getHitbox(e))){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
 
@@ -699,7 +784,7 @@
             const frameHeight = sprite.naturalHeight;
             // Apply visualOffsetX and visualOffsetY here
             ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + player.visualOffsetX, y + player.visualOffsetY, player.spriteW, player.spriteH);
-            if (debugMode) {
+            if (debugMode) { // Draw hitbox if debugMode is true
                 ctx.strokeStyle = 'rgba(255,0,0,0.8)';
                 ctx.lineWidth = 2;
                 // Hitbox remains at its logical position (x, y) + existing offsets
@@ -718,7 +803,7 @@
                 const frameHeight = sprite.naturalHeight;
                 // Apply visualOffsetX and visualOffsetY here
                 ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + def.visualOffsetX, y + def.visualOffsetY, def.spriteW, def.spriteH);
-                if (debugMode) {
+                if (debugMode) { // Draw hitbox if debugMode is true
                     ctx.strokeStyle = 'rgba(255,0,0,0.8)';
                     ctx.lineWidth = 2;
                     // Hitbox remains at its logical position (x, y) + existing offsets
@@ -734,10 +819,11 @@
     }
     // Main drawing function
     function draw(){
-         if (debugGalleryMode) {
-        drawDebugGallery();
-        return; // Stops normal game drawing
-    }
+        // Only draw debug gallery if debugGalleryMode is true
+        if (debugGalleryMode) {
+            drawDebugGallery();
+            return; // Stops normal game drawing
+        }
         // Update camera position based on current canvas size
         camera.x = player.x - canvas.width / 2;
         camera.y = player.y - canvas.height / 2;
@@ -779,6 +865,17 @@
                 ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16 + gem.visualOffsetX, gem.y - 16 + gem.visualOffsetY, 32, 32); 
             }
         });
+
+        // Draws Gold coins (with visualOffsetX/Y)
+        goldCoins.forEach(coin => {
+            if(assets.gold && assets.gold.complete && assets.gold.naturalHeight !== 0) {
+                const sprite = assets.gold;
+                const frameWidth = sprite.naturalWidth / coin.frameCount;
+                const frameHeight = sprite.naturalHeight;
+                const sourceX = coin.anim.frame * frameWidth;
+                ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, coin.x - 16 + coin.visualOffsetX, coin.y - 16 + coin.visualOffsetY, 32, 32);
+            }
+        });
         
         // Draws enemies and their health bars (with visualOffsetX/Y)
         enemies.forEach(e => {
@@ -794,7 +891,7 @@
                         ctx.strokeStyle = 'rgba(255,0,0,0.5)';
                         ctx.lineWidth = 2;
                         const hitbox = getHitbox(e);
-                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.h);
+                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
                     }
                 }
             }
@@ -872,6 +969,7 @@
             updateWeapons();
             updateProjectiles();
             updateXPGems();
+            updateGoldCoins(); // Call the new gold coins update function
             updatePlayerRegeneration(deltaTime); // Calls regeneration function
             updatePlayerInvincibility(); // Updates invincibility state
             gameState.gameTime+=deltaTime;
@@ -990,6 +1088,9 @@
                 <div id="health-bar" style="width: 100%;"></div>
                 <span id="health-text" class="bar-text">120/120</span>
             </div>
+            <div id="gold-display">
+                Or: <span id="gold-count">0</span>
+            </div>
         `;
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
         
@@ -1001,6 +1102,7 @@
         xpBarUI=document.getElementById('xp-bar');
         healthTextUI=document.getElementById('health-text'); // Get reference for health text
         xpTextUI=document.getElementById('xp-text');     // Get reference for XP text
+        goldUI=document.getElementById('gold-count'); // Get reference for gold count
         levelUpModal=document.getElementById('level-up-modal');
         upgradeOptionsContainer=document.getElementById('upgrade-options');
         gameOverModal=document.getElementById('game-over-modal');
