@@ -170,13 +170,14 @@
     let camera = { x: 0, y: 0 };
     let projectiles = [], enemies = [], xpGems = [];
     let enemySpawnTimer = 0;
+    let debugGalleryMode = false; // <-- NOUVEAU MODE GALERIE
 
-    const player = {x:world.width/2,y:world.height/2, w: 40, h: 120, spriteW: 128, spriteH: 160, speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},};
+    const player = {x:world.width/2,y:world.height/2, w: 40, h: 120, spriteW: 128, spriteH: 160, hitboxOffsetX: 44, hitboxOffsetY: 20, speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},};
     const enemyDefinitions={
-        goblin:{type:'goblin',w:50,h:100,spriteW:128,spriteH:160,speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
-        skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80,speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
-        slime:{type:'slime',w:80,h:60,spriteW:100,spriteH:80,speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
-        orc:{type:'orc',w:90,h:120,spriteW:128,spriteH:160,speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
+        goblin:{type:'goblin',w:30,h:75,spriteW:128,spriteH:160, hitboxOffsetX: 50, hitboxOffsetY: 60, speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
+        skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80, hitboxOffsetX: 12, hitboxOffsetY: 5, speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
+        slime:{type:'slime',w:80,h:60,spriteW:100,spriteH:80, hitboxOffsetX: 10, hitboxOffsetY: 20, speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
+        orc:{type:'orc',w:90,h:120,spriteW:128,spriteH:160, hitboxOffsetX: 19, hitboxOffsetY: 20, speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
     };
     const itemDefinitions = {xpGem: { frameCount: 7, animSpeed: 10 },};
     player.frameCount = 4; // Add frame count for player
@@ -191,52 +192,30 @@
         if (e.key.toLowerCase() === 'h') {
             debugMode = !debugMode;
         }
+        if (e.key.toLowerCase() === 'g') { 
+        debugGalleryMode = !debugGalleryMode;
+    }
     });
     document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
+
+    function getHitbox(entity) {
+        return {
+            x: entity.x + (entity.hitboxOffsetX || 0),
+            y: entity.y + (entity.hitboxOffsetY || 0),
+            w: entity.w,
+            h: entity.h
+        };
+    }
 
     function checkCollision(r1,r2){return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;}
     function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
     
-    function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nX={...player,x:player.x+mx};if(!checkCollisionWithObjects(nX,obstacles))player.x+=mx;const nY={...player,y:player.y+my};if(!checkCollisionWithObjects(nY,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
-    function spawnEnemies(){if(gameState.paused)return;enemySpawnTimer-=16;if(enemySpawnTimer<=0){const r=Math.max(200,2000-gameState.gameTime*2);enemySpawnTimer=r;const c=1+Math.floor(gameState.gameTime/10000);for(let i=0;i<c;i++){let x,y,sR,ok=false;for(let a=0;a<10;a++){const an=Math.random()*Math.PI*2;const d=Math.max(canvas.width/2,canvas.height/2)+50;x=player.x+Math.cos(an)*d;y=player.y+Math.sin(an)*d;const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];sR={x,y,w:t.w,h:t.h};if(!checkCollisionWithObjects(sR,obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){ok=true;break;}}if(ok){const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];enemies.push({x,y,...t,currentHealth:t.health,anim:{frame:0,timer:0,speed:t.animSpeed}});}}}}
+    function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nextPos = getHitbox(player);nextPos.x += mx;if(!checkCollisionWithObjects(nextPos,obstacles))player.x+=mx;nextPos.x -= mx;nextPos.y += my;if(!checkCollisionWithObjects(nextPos,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
+    function spawnEnemies(){if(gameState.paused)return;enemySpawnTimer-=16;if(enemySpawnTimer<=0){const r=Math.max(200,2000-gameState.gameTime*2);enemySpawnTimer=r;const c=1+Math.floor(gameState.gameTime/10000);for(let i=0;i<c;i++){let x,y,sR,ok=false;for(let a=0;a<10;a++){const an=Math.random()*Math.PI*2;const d=Math.max(canvas.width/2,canvas.height/2)+50;x=player.x+Math.cos(an)*d;y=player.y+Math.sin(an)*d;const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];sR={x,y,w:t.w,h:t.h,hitboxOffsetX:t.hitboxOffsetX,hitboxOffsetY:t.hitboxOffsetY};if(!checkCollisionWithObjects(getHitbox(sR),obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){ok=true;break;}}if(ok){const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];enemies.push({x,y,...t,currentHealth:t.health,anim:{frame:0,timer:0,speed:t.animSpeed}});}}}}
     function getEnemyTypeByTime(){const rnd=Math.random();if(gameState.gameTime<30000)return'goblin';if(gameState.gameTime<90000)return rnd<0.6?'goblin':'skeleton';if(gameState.gameTime<180000)return rnd<0.4?'goblin':(rnd<0.8?'skeleton':'slime');return rnd<0.2?'goblin':(rnd<0.5?'skeleton':(rnd<0.8?'slime':'orc'));}
-    function updateEnemies(){enemies.forEach(e=>{const dx=player.x-e.x;const dy=player.y-e.y;const d=Math.sqrt(dx*dx+dy*dy);if(d>1){const mx=(dx/d)*e.speed;const my=(dy/d)*e.speed;const nX={...e,x:e.x+mx};if(!checkCollisionWithObjects(nX,obstacles))e.x+=mx;const nY={...e,y:e.y+my};if(!checkCollisionWithObjects(nY,obstacles))e.y+=my;}if(checkCollision(player,e)){takeDamage(e.damage,e);}e.anim.timer++;if(e.anim.timer>e.anim.speed){e.anim.timer=0;e.anim.frame=(e.anim.frame+1)%e.frameCount;}});}
-    function killEnemy(enemy){
-    enemy.isDead=true;
-    gameState.killCount++;
-    if(Math.random()<0.8){
-        const gemInfo = itemDefinitions.xpGem;
-        xpGems.push({
-            x:enemy.x+enemy.w/2,
-            y:enemy.y+enemy.h/2,
-            value:enemy.xp,
-            anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
-            frameCount: gemInfo.frameCount
-        });
-    }
-    enemies=enemies.filter(en=>en!==enemy);
-}
-    function updateXPGems() {
-    for (let i = xpGems.length - 1; i >= 0; i--) {
-        const g = xpGems[i];
-        g.anim.timer++;
-        if (g.anim.timer > g.anim.speed) {
-            g.anim.timer = 0;
-            g.anim.frame = (g.anim.frame + 1) % g.frameCount;
-        }
-        const dx = (player.x + player.w / 2) - g.x;
-        const dy = (player.y + player.h / 2) - g.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < player.magnetRadius) {
-            g.x += (dx / d) * 6;
-            g.y += (dy / d) * 6;
-        }
-        if (d < player.w / 2) {
-            collectXP(g.value);
-            xpGems.splice(i, 1);
-        }
-    }
-}
+    function updateEnemies(){enemies.forEach(e=>{const dx=player.x-e.x;const dy=player.y-e.y;const d=Math.sqrt(dx*dx+dy*dy);if(d>1){const mx=(dx/d)*e.speed;const my=(dy/d)*e.speed;const nextPos=getHitbox(e);nextPos.x+=mx;if(!checkCollisionWithObjects(nextPos,obstacles))e.x+=mx;nextPos.x-=mx;nextPos.y+=my;if(!checkCollisionWithObjects(nextPos,obstacles))e.y+=my;}if(checkCollision(getHitbox(player),getHitbox(e))){takeDamage(e.damage,e);}e.anim.timer++;if(e.anim.timer>e.anim.speed){e.anim.timer=0;e.anim.frame=(e.anim.frame+1)%e.frameCount;}});}
+    function killEnemy(enemy){enemy.isDead=true;gameState.killCount++;if(Math.random()<0.8){const gemInfo = itemDefinitions.xpGem;xpGems.push({x:enemy.x+enemy.w/2,y:enemy.y+enemy.h/2,value:enemy.xp,anim:{frame:0,timer:0,speed:gemInfo.animSpeed},frameCount:gemInfo.frameCount});}enemies=enemies.filter(en=>en!==enemy);}
+    function updateXPGems() {for (let i=xpGems.length-1;i>=0;i--){const g=xpGems[i];g.anim.timer++;if(g.anim.timer>g.anim.speed){g.anim.timer=0;g.anim.frame=(g.anim.frame+1)%g.frameCount;}const dx=(player.x+player.w/2)-g.x;const dy=(player.y+player.h/2)-g.y;const d=Math.sqrt(dx*dx+dy*dy);if(d<player.magnetRadius){g.x+=(dx/d)*6;g.y+=(dy/d)*6;}if(d<player.w/2){collectXP(g.value);xpGems.splice(i,1);}}}
     function collectXP(amount){player.xp+=amount;if(player.xp>=player.xpToNextLevel){levelUp();}}
     function levelUp(){gameState.paused=true;player.level++;player.xp-=player.xpToNextLevel;player.xpToNextLevel=Math.floor(player.xpToNextLevel*1.5);player.health=player.maxHealth;levelUpModal.style.display='flex';populateUpgradeOptions();}
     function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
@@ -246,12 +225,62 @@
     function findNearestEnemy(){let n=null,nD=Infinity;enemies.forEach(e=>{const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<nD){nD=d;n=e;}});return n;}
     function updateUI(){levelUI.textContent=`Niveau: ${player.level}`;timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;killCountUI.textContent=`Kills: ${gameState.killCount}`;healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;}
     function updateWeapons(){const now=Date.now();const mm=player.weapons.magicMissile;if(mm.level>0&&now-mm.lastShot>mm.cooldown){const target=findNearestEnemy();if(target){mm.lastShot=now;const dx=target.x-player.x;const dy=target.y-player.y;const angle=Math.atan2(dy,dx);projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan:100,angle:angle});}}
-    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,enemy)){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
+    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
     const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
-    function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,e)){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
+    function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,getHitbox(e))){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
+    function drawDebugGallery() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#444'; // Fond neutre pour la galerie
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "12px 'Press Start 2P'";
+    ctx.fillStyle = '#fff';
 
-    // --- DRAW LOOP (UPDATED) ---
+    let x = 50;
+    let y = 50;
+    const spacing = 200;
+
+    // Dessine le joueur
+    ctx.fillText("Player", x, y - 10);
+    if (assets.player && assets.player.complete) {
+        const sprite = assets.player;
+        const frameWidth = sprite.naturalWidth / player.frameCount;
+        const frameHeight = sprite.naturalHeight;
+        ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x, y, player.spriteW, player.spriteH);
+        if (debugMode) {
+            ctx.strokeStyle = 'rgba(255,0,0,0.8)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + player.hitboxOffsetX, y + player.hitboxOffsetY, player.w, player.h);
+        }
+    }
+    x += spacing;
+
+    // Dessine chaque ennemi
+    for(const key in enemyDefinitions) {
+        const def = enemyDefinitions[key];
+        ctx.fillText(key, x, y - 10);
+        if (assets[key] && assets[key].complete) {
+            const sprite = assets[key];
+            const frameWidth = sprite.naturalWidth / def.frameCount;
+            const frameHeight = sprite.naturalHeight;
+            ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x, y, def.spriteW, def.spriteH);
+            if (debugMode) {
+                ctx.strokeStyle = 'rgba(255,0,0,0.8)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + def.hitboxOffsetX, y + def.hitboxOffsetY, def.w, def.h);
+            }
+        }
+        x += spacing;
+        if (x + spacing > canvas.width) {
+            x = 50;
+            y += spacing;
+        }
+    }
+}
     function draw(){
+         if (debugGalleryMode) {
+        drawDebugGallery();
+        return; // On arrête le dessin normal du jeu
+    }
         camera.x=player.x-canvas.width/2;camera.y=player.y-canvas.height/2;
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.save();
@@ -285,15 +314,18 @@
                     if(debugMode) {
                         ctx.strokeStyle = 'rgba(255,0,0,0.5)';
                         ctx.lineWidth = 2;
-                        ctx.strokeRect(e.x, e.y, e.w, e.h);
+                        const hitbox = getHitbox(e);
+                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
                     }
                 }
             }
-            if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x,e.y-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x,e.y-8,e.w*(e.currentHealth/e.health),4);}
+            if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
         });
     
         ctx.save();
-        ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
+        const playerSpriteX = player.x - (player.spriteW - player.w) / 2 + player.hitboxOffsetX;
+        const playerSpriteY = player.y - (player.spriteH - player.h) / 2 + player.hitboxOffsetY;
+        ctx.translate(player.x + player.w / 2 + player.hitboxOffsetX, player.y + player.h / 2 + player.hitboxOffsetY);
         if (!player.anim.facingRight) { ctx.scale(-1, 1); }
         if(assets.player && assets.player.complete && assets.player.naturalHeight !== 0) {
             const sprite = assets.player;
@@ -301,13 +333,15 @@
             const frameHeight = sprite.naturalHeight;
             const sourceX = player.anim.frame * frameWidth;
             ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.spriteH / 2, player.spriteW, player.spriteH);
-            if(debugMode) {
-                ctx.strokeStyle = 'rgba(255,0,0,0.5)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(-player.w / 2, -player.h / 2, player.w, player.h);
-            }
         }
         ctx.restore();
+        
+        if(debugMode) {
+            ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+            ctx.lineWidth = 2;
+            const hitbox = getHitbox(player);
+            ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+        }
 
         const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();}
         projectiles.forEach(p=>{ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);ctx.fill();});
@@ -317,8 +351,24 @@
     }
 
     let lastTime = 0;
-    function gameLoop(timestamp){if(!gameState.running)return;const deltaTime=timestamp-lastTime;lastTime=timestamp;if(!gameState.paused){updatePlayer();spawnEnemies();updateEnemies();updateWeapons();updateProjectiles();updateXPGems();gameState.gameTime+=deltaTime;}draw();updateUI();requestAnimationFrame(gameLoop);}
-    
+    function gameLoop(timestamp) {
+    if (!gameState.running) return;
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+    // On ajoute !debugGalleryMode ici
+    if (!gameState.paused && !debugGalleryMode) {
+        updatePlayer();
+        spawnEnemies();
+        updateEnemies();
+        updateWeapons();
+        updateProjectiles();
+        updateXPGems();
+        gameState.gameTime += deltaTime;
+    }
+    draw();
+    updateUI();
+    requestAnimationFrame(gameLoop);
+}    
     function init(){
         document.getElementById('ui-container').innerHTML=`<div id="stats"><div id="level">Niveau: 1</div><div id="timer">Temps: 0s</div><div id="kill-count">Kills: 0</div></div><div id="xp-bar-container"><div id="xp-bar" style="width: 0%;"></div></div><div id="health-bar-container"><div id="health-bar" style="width: 100%;"></div></div>`;
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
@@ -332,6 +382,7 @@
             requestAnimationFrame(gameLoop);
         });
     }
+    
 
     init();
 </script>
