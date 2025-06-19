@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Survivors</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Press+Start+2P',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            border: 4px solid #5a3d2b;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: #000;
+            width: clamp(320px, 90vw, 1400px);
+            height: clamp(240px, 85vh, 900px);
+        }
+        canvas {
+            display: block;
+            background-color: #333; /* Fallback */
+            width: 100%;
+            height: 100%;
+        }
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            pointer-events: none;
+        }
+        #stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 2px 2px 2px #000;
+        }
+        #health-bar-container, #xp-bar-container {
+            width: 100%;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 2px solid #fff;
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        #health-bar, #xp-bar {
+            height: 100%;
+            transition: width 0.2s ease-in-out;
+        }
+        #health-bar { background-color: #c0392b; }
+        #xp-bar { background-color: #2980b9; }
+        .modal {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+        }
+        .modal h2 { font-size: 24px; color: #f1c40f; margin-bottom: 20px; }
+        .modal-content {
+            background-color: #2c2c2c;
+            padding: 30px;
+            border: 4px solid #5a3d2b;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .upgrade-option {
+            background-color: #4a4a4a;
+            border: 2px solid #eee;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 5px;
+        }
+        .upgrade-option:hover { background-color: #f1c40f; color: #1a1a1a; }
+        #game-over-modal button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            padding: 15px 30px;
+            background-color: #f1c40f;
+            color: #1a1a1a;
+            border: none;
+            cursor: pointer;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-container"></div>
+</div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gameContainer = document.getElementById('game-container');
+
+    // --- Asset Loading ---
+    const assets = {};
+    const assetSources = {
+        player: 'https://placehold.co/64x80/bdbdbd/000000?text=Knight',
+        goblin: 'https://placehold.co/48x48/4caf50/000000?text=Goblin',
+        skeleton: 'https://placehold.co/48x64/f5f5f5/000000?text=Skel',
+        slime: 'https://placehold.co/50x40/00acc1/000000?text=Slime',
+        orc: 'https://placehold.co/64x64/607d8b/000000?text=Orc',
+        xpGem: 'https://placehold.co/24x24/2196f3/ffffff?text=XP',
+        background: 'https://placehold.co/128x128/5a4b42/4a3b32?text=Stone'
+    };
+
+    function loadAssets(callback) {
+        let loadedCount = 0;
+        const totalAssets = Object.keys(assetSources).length;
+        for (const key in assetSources) {
+            assets[key] = new Image();
+            assets[key].crossOrigin = "Anonymous"; // Handle potential CORS issues
+            assets[key].src = assetSources[key];
+            assets[key].onload = () => {
+                loadedCount++;
+                if (loadedCount === totalAssets) {
+                    callback();
+                }
+            };
+            assets[key].onerror = () => {
+              console.error(`Failed to load asset: ${key}`);
+              // Fallback: create a simple colored square
+              const canvas = document.createElement('canvas');
+              const w = 64, h = 64;
+              canvas.width = w;
+              canvas.height = h;
+              const assetCtx = canvas.getContext('2d');
+              assetCtx.fillStyle = 'magenta';
+              assetCtx.fillRect(0, 0, w, h);
+              assets[key].src = canvas.toDataURL();
+              loadedCount++;
+              if (loadedCount === totalAssets) {
+                    callback();
+                }
+            };
+        }
+    }
+
+    // --- Game State & World Setup ---
+    const world = { width: 3000, height: 3000 };
+    let obstacles = [], backgroundPattern;
+    let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI,
+        levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI;
+    let gameState = { running: true, paused: false, gameTime: 0, killCount: 0 };
+    let keys = {};
+    let camera = { x: 0, y: 0 };
+    let projectiles = [], enemies = [], xpGems = [];
+    let enemySpawnTimer = 0;
+
+    const player = {x:world.width/2,y:world.height/2,w:64,h:80,speed:3.5,health:100,maxHealth:100,xp:0,level:1,xpToNextLevel:10,magnetRadius:100,anim:{isMoving:false,facingRight:true},weapons:{magicMissile:{level:1,cooldown:1500,lastShot:0,damage:10},aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},};
+    const enemyDefinitions={goblin:{type:'goblin',w:48,h:48,speed:1.5,health:10,damage:5,xp:2},skeleton:{type:'skeleton',w:48,h:64,speed:1,health:20,damage:10,xp:5},slime:{type:'slime',w:50,h:40,speed:0.8,health:30,damage:8,xp:7},orc:{type:'orc',w:64,h:64,speed:1.2,health:50,damage:15,xp:15},};
+    const availableUpgrades=[{id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1500-w.level*100);w.damage+=5;}},{id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},{id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},{id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},{id:'speed',name:'Bottes de vitesse',description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5;}}];
+
+    function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
+    
+    // ---UNCHANGED LOGIC (MINIMIZED)---
+    function resizeCanvas(){canvas.width=gameContainer.clientWidth;canvas.height=gameContainer.clientHeight;}
+    window.addEventListener('resize',resizeCanvas);document.addEventListener('keydown',(e)=>{keys[e.key.toLowerCase()]=true;});document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
+    function checkCollision(r1,r2){return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;}
+    function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
+    function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nX={...player,x:player.x+mx};if(!checkCollisionWithObjects(nX,obstacles))player.x+=mx;const nY={...player,y:player.y+my};if(!checkCollisionWithObjects(nY,obstacles))player.y+=my;}}
+    function spawnEnemies(){if(gameState.paused)return;enemySpawnTimer-=16;if(enemySpawnTimer<=0){const r=Math.max(200,2000-gameState.gameTime*2);enemySpawnTimer=r;const c=1+Math.floor(gameState.gameTime/10000);for(let i=0;i<c;i++){let x,y,sR,ok=false;for(let a=0;a<10;a++){const an=Math.random()*Math.PI*2;const d=Math.max(canvas.width/2,canvas.height/2)+50;x=player.x+Math.cos(an)*d;y=player.y+Math.sin(an)*d;const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];sR={x,y,w:t.w,h:t.h};if(!checkCollisionWithObjects(sR,obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){ok=true;break;}}if(ok){const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];enemies.push({x,y,...t,currentHealth:t.health});}}}}
+    function getEnemyTypeByTime(){const rnd=Math.random();if(gameState.gameTime<30000)return'goblin';if(gameState.gameTime<90000)return rnd<0.6?'goblin':'skeleton';if(gameState.gameTime<180000)return rnd<0.4?'goblin':(rnd<0.8?'skeleton':'slime');return rnd<0.2?'goblin':(rnd<0.5?'skeleton':(rnd<0.8?'slime':'orc'));}
+    function updateEnemies(){enemies.forEach(e=>{const dx=player.x-e.x;const dy=player.y-e.y;const d=Math.sqrt(dx*dx+dy*dy);if(d>1){const mx=(dx/d)*e.speed;const my=(dy/d)*e.speed;const nX={...e,x:e.x+mx};if(!checkCollisionWithObjects(nX,obstacles))e.x+=mx;const nY={...e,y:e.y+my};if(!checkCollisionWithObjects(nY,obstacles))e.y+=my;}if(checkCollision(player,e)){takeDamage(e.damage,e);}});}
+    function killEnemy(enemy){enemy.isDead=true;gameState.killCount++;if(Math.random()<0.8){xpGems.push({x:enemy.x+enemy.w/2,y:enemy.y+enemy.h/2,value:enemy.xp});}enemies=enemies.filter(en=>en!==enemy);}
+    function updateXPGems(){for(let i=xpGems.length-1;i>=0;i--){const g=xpGems[i];const dx=(player.x+player.w/2)-g.x;const dy=(player.y+player.h/2)-g.y;const d=Math.sqrt(dx*dx+dy*dy);if(d<player.magnetRadius){g.x+=(dx/d)*6;g.y+=(dy/d)*6;}if(d<player.w/2){collectXP(g.value);xpGems.splice(i,1);}}}
+    function collectXP(amount){player.xp+=amount;if(player.xp>=player.xpToNextLevel){levelUp();}}
+    function levelUp(){gameState.paused=true;player.level++;player.xp-=player.xpToNextLevel;player.xpToNextLevel=Math.floor(player.xpToNextLevel*1.5);player.health=player.maxHealth;levelUpModal.style.display='flex';populateUpgradeOptions();}
+    function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
+    function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
+    let lastDamageTime=0;function takeDamage(amount,enemy){const now=Date.now();if(now-lastDamageTime>500){lastDamageTime=now;player.health-=amount;if(player.health<=0){player.health=0;gameOver();}}}
+    function gameOver(){gameState.running=false;finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;gameOverModal.style.display='flex';}
+    function findNearestEnemy(){let n=null,nD=Infinity;enemies.forEach(e=>{const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<nD){nD=d;n=e;}});return n;}
+    function updateUI(){levelUI.textContent=`Niveau: ${player.level}`;timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;killCountUI.textContent=`Kills: ${gameState.killCount}`;healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;}
+    function updateWeapons(){const now=Date.now();const mm=player.weapons.magicMissile;if(mm.level>0&&now-mm.lastShot>mm.cooldown){const target=findNearestEnemy();if(target){mm.lastShot=now;const dx=target.x-player.x;const dy=target.y-player.y;const angle=Math.atan2(dy,dx);projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan:100,angle:angle});}}
+    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,enemy)){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
+    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
+    function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,e)){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
+
+    // --- DRAW LOOP (UPDATED) ---
+    function draw(){
+        camera.x=player.x-canvas.width/2;camera.y=player.y-canvas.height/2;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.save();
+        ctx.translate(-camera.x,-camera.y);
+
+        if(backgroundPattern) {
+            ctx.fillStyle = backgroundPattern;
+            ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
+        }
+
+        obstacles.forEach(o => { ctx.fillStyle = '#1a1a1a'; ctx.fillRect(o.x, o.y, o.w, o.h); });
+        
+        xpGems.forEach(gem => { if(assets.xpGem) ctx.drawImage(assets.xpGem, gem.x - 12, gem.y - 12); });
+        
+        enemies.forEach(e => {
+            if(assets[e.type]) {
+                const sprite = assets[e.type];
+                if (sprite.complete && sprite.naturalHeight !== 0) {
+                    ctx.drawImage(sprite, e.x, e.y, e.w, e.h);
+                }
+            }
+            if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x,e.y-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x,e.y-8,e.w*(e.currentHealth/e.health),4);}
+        });
+    
+        ctx.save();
+        ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
+        if (!player.anim.facingRight) { ctx.scale(-1, 1); }
+        if(assets.player && assets.player.complete && assets.player.naturalHeight !== 0) {
+            ctx.drawImage(assets.player, -player.w / 2, -player.h / 2, player.w, player.h);
+        }
+        ctx.restore();
+
+        const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();}
+        projectiles.forEach(p=>{ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);ctx.fill();});
+        const aura=player.weapons.aura;if(aura.level>0){const orbW=24,orbH=24;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
+        
+        ctx.restore();
+    }
+
+    let lastTime = 0;
+    function gameLoop(timestamp){if(!gameState.running)return;const deltaTime=timestamp-lastTime;lastTime=timestamp;if(!gameState.paused){updatePlayer();spawnEnemies();updateEnemies();updateWeapons();updateProjectiles();updateXPGems();gameState.gameTime+=deltaTime;}draw();updateUI();requestAnimationFrame(gameLoop);}
+    
+    function init(){
+        document.getElementById('ui-container').innerHTML=`<div id="stats"><div id="level">Niveau: 1</div><div id="timer">Temps: 0s</div><div id="kill-count">Kills: 0</div></div><div id="xp-bar-container"><div id="xp-bar" style="width: 0%;"></div></div><div id="health-bar-container"><div id="health-bar" style="width: 100%;"></div></div>`;
+        document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
+        levelUI=document.getElementById('level');timerUI=document.getElementById('timer');killCountUI=document.getElementById('kill-count');healthBarUI=document.getElementById('health-bar');xpBarUI=document.getElementById('xp-bar');levelUpModal=document.getElementById('level-up-modal');upgradeOptionsContainer=document.getElementById('upgrade-options');gameOverModal=document.getElementById('game-over-modal');finalScoreUI=document.getElementById('final-score');
+        
+        resizeCanvas();
+        createBackgroundAndObstacles();
+
+        loadAssets(() => {
+            backgroundPattern = ctx.createPattern(assets.background, 'repeat');
+            requestAnimationFrame(gameLoop);
+        });
+    }
+
+    init();
+</script>
+</body>
+</html>
