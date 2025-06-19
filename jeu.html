@@ -179,12 +179,12 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container"></div>
-    <!-- Menu principal -->
+    <!-- Main Menu -->
     <div id="main-menu">
         <h1>D&D Survivors</h1>
         <p>APPUYEZ SUR N'IMPORTE QUELLE TOUCHE POUR COMMENCER</p>
     </div>
-    <!-- Menu Pause -->
+    <!-- Pause Menu -->
     <div id="pause-modal" class="modal">
         <div class="modal-content">
             <h2>PAUSE</h2>
@@ -200,7 +200,7 @@
             <button onclick="resumeGame()">Reprendre</button>
         </div>
     </div>
-    <!-- Écran de Victoire -->
+    <!-- Victory Screen -->
     <div id="victory-modal" class="modal">
         <div class="modal-content">
             <h2>VICTOIRE !</h2>
@@ -214,13 +214,13 @@
     const ctx = canvas.getContext('2d');
     const gameContainer = document.getElementById('game-container');
     const uiContainer = document.getElementById('ui-container');
-    const mainMenu = document.getElementById('main-menu'); // Référence au menu principal
-    const pauseModal = document.getElementById('pause-modal'); // Référence au menu pause
-    const victoryModal = document.getElementById('victory-modal'); // Référence à la modal de victoire
+    const mainMenu = document.getElementById('main-menu'); // Reference to the main menu
+    const pauseModal = document.getElementById('pause-modal'); // Reference to the pause menu
+    const victoryModal = document.getElementById('victory-modal'); // Reference to the victory modal
 
     // --- Asset Loading ---
     const assets = {};
-    // Sources des images du jeu
+    // Game image sources
     const assetSources = {
         player: 'images/player_spritesheet.png',
         goblin: 'images/goblin_spritesheet.png',
@@ -228,10 +228,11 @@
         slime: 'images/slime_spritesheet.png',
         orc: 'images/orc_spritesheet.png',
         xpGem: 'images/xpGem_spritesheet.png',
-        background: 'images/background.png'
+        background: 'images/background.png',
+        obstacle: 'images/obstacles.png' // New obstacle image (placeholder for now)
     };
 
-    // Charge toutes les images définies dans assetSources
+    // Loads all images defined in assetSources
     function loadAssets(callback) {
         let loadedCount = 0;
         const totalAssets = Object.keys(assetSources).length;
@@ -244,7 +245,7 @@
                     callback();
                 }
             };
-            // Gère les erreurs de chargement d'image en utilisant un carré magenta
+            // Handles image loading errors by using a magenta square
             assets[key].onerror = () => {
               console.error(`Failed to load asset: ${key} at ${assetSources[key]}`);
               const canvas = document.createElement('canvas');
@@ -264,50 +265,50 @@
     }
 
     // --- Game State & World Setup ---
-    // Dimensions du monde du jeu
+    // Game world dimensions
     const world = { width: 3000, height: 3000 };
     let obstacles = [], backgroundPattern;
-    // Éléments de l'interface utilisateur
+    // User interface elements
     let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI,
         levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
-        pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // Nouveaux éléments UI pour la pause
-    // État du jeu
-    let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Ajout de gameStarted
-    // État des touches du clavier
+        pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // New UI elements for pause
+    // Game state
+    let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Added gameStarted
+    // Keyboard key state
     let keys = {};
-    // Modes de débogage
+    // Debug modes
     let debugMode = false;
     let debugGalleryMode = false;
-    // Caméra du jeu
+    // Game camera
     let camera = { x: 0, y: 0 };
-    // Entités du jeu
+    // Game entities
     let projectiles = [], enemies = [], xpGems = [];
     let enemySpawnTimer = 0;
 
-    // Propriétés du joueur (ajout de visualOffsetX et visualOffsetY)
+    // Player properties (added visualOffsetX and visualOffsetY)
     const player = {
         x:world.width/2,y:world.height/2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
-        visualOffsetX: 0, visualOffsetY: -10, // Nouveaux offsets pour le rendu visuel
+        visualOffsetX: 0, visualOffsetY: -10, // New offsets for visual rendering
         speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,
-        regenerationRate: 0, // Nouveau: points de vie par seconde à régénérer
-        invincible: false, // Nouveau: état d'invincibilité du joueur
-        invincibilityEndTime: 0, // Nouveau: temps de fin de l'invincibilité
+        regenerationRate: 0, // New: health points per second to regenerate
+        invincible: false, // New: player invincibility state
+        invincibilityEndTime: 0, // New: invincibility end time
         anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},
         weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},
         aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},
         auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},
     };
-    // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
+    // Enemy definitions (added visualOffsetX and visualOffsetY)
     const enemyDefinitions={
         goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
         skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80, hitboxOffsetX: 12, hitboxOffsetY: 5, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
         slime:{type:'slime',w:40,h:30,spriteW:100,spriteH:80, hitboxOffsetX: 30, hitboxOffsetY: 30, visualOffsetX: 0, visualOffsetY: 0, speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
         orc:{type:'orc',w:50,h:110,spriteW:128,spriteH:160, hitboxOffsetX: 35, hitboxOffsetY: 22, visualOffsetX: 0, visualOffsetY: 0, speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
     };
-    // Définitions des objets (ex: gemmes d'XP) (ajout de visualOffsetX et visualOffsetY)
+    // Object definitions (e.g., XP gems) (added visualOffsetX and visualOffsetY)
     const itemDefinitions = {xpGem: { frameCount: 7, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 },};
-    player.frameCount = 4; // Nombre de frames pour l'animation du joueur
-    // Améliorations disponibles lors du passage de niveau
+    player.frameCount = 4; // Number of frames for player animation
+    // Available upgrades when leveling up
     const availableUpgrades=[
         {id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1200-w.level*100);w.damage+=5;}},
         {id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
@@ -317,46 +318,46 @@
         {
             id:'regeneration',
             name:'Régénération',
-            description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description pour l'amélioration
+            description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description for the upgrade
             apply:()=>{player.regenerationRate+=0.5;}
         }
     ];
 
-    // Crée le fond et les obstacles du monde
+    // Creates the background and obstacles of the world
     function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
     
-    // Ajuste la taille du canvas en fonction du conteneur du jeu
+    // Adjusts canvas size based on game container
     function resizeCanvas(){canvas.width=gameContainer.clientWidth;canvas.height=gameContainer.clientHeight;}
     
-    // Gère les événements d'appui et de relâchement des touches
+    // Handles key press and release events
     document.addEventListener('keydown', (e) => { 
-        if (!gameState.gameStarted) { // Si le jeu n'a pas commencé, n'importe quelle touche le démarre
+        if (!gameState.gameStarted) { // If game hasn't started, any key starts it
             startGame();
-            return; // Sort de la fonction pour éviter de traiter la touche pour le mouvement
+            return; // Exit function to avoid processing key for movement
         }
         keys[e.key.toLowerCase()] = true; 
 
-        if (e.key.toLowerCase() === 'escape') { // Gère la touche Échap pour la pause
-            if (gameState.running && !debugGalleryMode) { // Ne pas pauser si le jeu est déjà terminé ou en mode debug gallery
+        if (e.key.toLowerCase() === 'escape') { // Handles Escape key for pause
+            if (gameState.running && !debugGalleryMode) { // Do not pause if game is already over or in debug gallery mode
                 if (gameState.paused) {
-                    resumeGame();
-                } else {
                     pauseGame();
+                } else {
+                    resumeGame();
                 }
             }
         }
         
         if (e.key.toLowerCase() === 'h') {
-            debugMode = !debugMode; // Active/désactive le mode débogage
+            debugMode = !debugMode; // Toggles debug mode
         }
         if (e.key.toLowerCase() === 'g') {
-            debugGalleryMode = !debugGalleryMode; // Active/désactive le mode galerie de débogage
+            debugGalleryMode = !debugGalleryMode; // Toggles debug gallery mode
             uiContainer.style.display = debugGalleryMode ? 'none' : 'block';
         }
     });
     document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
 
-    // Calcule la boîte de collision d'une entité
+    // Calculates entity hitbox
     function getHitbox(entity) {
         return {
             x: entity.x + (entity.hitboxOffsetX || 0),
@@ -366,42 +367,42 @@
         };
     }
 
-    // Vérifie la collision entre deux rectangles
+    // Checks collision between two rectangles
     function checkCollision(r1,r2){return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;}
-    // Vérifie la collision d'un rectangle avec une liste d'objets
+    // Checks collision of a rectangle with a list of objects
     function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
     
-    // Met à jour la position et l'animation du joueur
+    // Updates player position and animation
     function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nextPos = getHitbox(player);nextPos.x += mx;if(!checkCollisionWithObjects(nextPos,obstacles))player.x+=mx;nextPos.x-=mx;nextPos.y+=my;if(!checkCollisionWithObjects(nextPos,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
-    // Fait apparaître les ennemis
+    // Spawns enemies
     function spawnEnemies(){
         if(gameState.paused)return;
         
-        // Ajustement du temps entre chaque vague d'ennemis (plus long au début)
+        // Adjusts time between each enemy wave (longer at first)
         const initialSpawnDelay = 2000; // ms
         const minSpawnDelay = 300; // ms
-        const spawnDelayReductionRate = 0.05; // ms de réduction par ms de gameTime (1ms de réduction pour 20ms de temps de jeu)
+        const spawnDelayReductionRate = 0.01; // ms reduction per ms of gameTime (slows down game hardening)
         const currentSpawnDelay = Math.max(minSpawnDelay, initialSpawnDelay - gameState.gameTime * spawnDelayReductionRate);
         
-        enemySpawnTimer -= 16; // Diminue le timer de 16ms (environ le temps d'une frame)
+        enemySpawnTimer -= 16; // Decreases timer by 16ms (approx. one frame time)
         if(enemySpawnTimer <= 0){
-            enemySpawnTimer = currentSpawnDelay; // Réinitialise le timer avec la nouvelle valeur de difficulté
+            enemySpawnTimer = currentSpawnDelay; // Resets timer with new difficulty value
             
-            // Ajustement du nombre d'ennemis par vague (plus faible au début)
+            // Adjusts number of enemies per wave (lower at first)
             const initialEnemiesPerSpawn = 1;
-            const enemyIncreaseRate = 1 / 45000; // 1 ennemi supplémentaire toutes les 45 secondes
-            const maxEnemiesPerSpawn = 10; // Limite le nombre maximum d'ennemis par vague
+            const enemyIncreaseRate = 1 / 90000; // 1 additional enemy every 90 seconds
+            const maxEnemiesPerSpawn = 10; // Limits maximum number of enemies per wave
             const currentEnemiesToSpawn = Math.min(maxEnemiesPerSpawn, initialEnemiesPerSpawn + Math.floor(gameState.gameTime * enemyIncreaseRate));
 
             for(let i=0;i<currentEnemiesToSpawn;i++){
                 let x,y,sR,ok=false;
-                for(let a=0;a<10;a++){ // Tente 10 fois de trouver une position valide
+                for(let a=0;a<10;a++){ // Tries 10 times to find a valid position
                     const an=Math.random()*Math.PI*2;
-                    const d=Math.max(canvas.width/2,canvas.height/2)+50; // Distance du joueur
+                    const d=Math.max(canvas.width/2,canvas.height/2)+50; // Distance from player
                     x=player.x+Math.cos(an)*d;
                     y=player.y+Math.sin(an)*d;
                     
-                    // Utilise la nouvelle logique pour obtenir le type d'ennemi
+                    // Uses new logic to get enemy type
                     const tK=getEnemyTypeByTime();
                     const t=enemyDefinitions[tK];
                     
@@ -414,32 +415,32 @@
                 if(ok){
                     const tK=getEnemyTypeByTime();
                     const t=enemyDefinitions[tK];
-                    // Initialise lastDamageTime pour chaque nouvel ennemi
+                    // Initializes lastDamageTime for each new enemy
                     enemies.push({x,y,...t,currentHealth:t.health,anim:{frame:0,timer:0,speed:t.animSpeed}, lastDamageTime: 0});
                 }
             }
         }
     }
-    // Détermine le type d'ennemi à faire apparaître en fonction du temps de jeu
+    // Determines enemy type to spawn based on game time
     function getEnemyTypeByTime(){
         const gameTimeSeconds = gameState.gameTime / 1000;
-        let availableEnemyTypes = ['goblin']; // Les goblins apparaissent toujours
+        let availableEnemyTypes = ['goblin']; // Goblins always appear
 
-        if (gameTimeSeconds >= 5 * 60) { // Après 5 minutes (300 secondes)
+        if (gameTimeSeconds >= 5 * 60) { // After 5 minutes (300 seconds)
             availableEnemyTypes.push('skeleton');
         }
-        if (gameTimeSeconds >= 10 * 60) { // Après 10 minutes (600 secondes)
+        if (gameTimeSeconds >= 10 * 60) { // After 10 minutes (600 seconds)
             availableEnemyTypes.push('slime');
         }
-        if (gameTimeSeconds >= 15 * 60) { // Après 15 minutes (900 secondes)
+        if (gameTimeSeconds >= 15 * 60) { // After 15 minutes (900 seconds)
             availableEnemyTypes.push('orc');
         }
 
-        // Sélectionne un type d'ennemi aléatoire parmi ceux disponibles
+        // Selects a random enemy type from available ones
         const randomIndex = Math.floor(Math.random() * availableEnemyTypes.length);
         return availableEnemyTypes[randomIndex];
     }
-    // Met à jour la position et l'animation des ennemis
+    // Updates enemy position and animation
     function updateEnemies(){
         const now = Date.now();
         enemies.forEach(e=>{
@@ -456,12 +457,12 @@
                 nextPos.y+=my;
                 if(!checkCollisionWithObjects(nextPos,obstacles))e.y+=my;
             }
-            // Vérifie la collision et le temps de rechargement des dégâts de l'ennemi
+            // Checks collision and enemy damage cooldown
             if(checkCollision(getHitbox(player),getHitbox(e))){
-                const damageCooldown = 1000; // 1 seconde de délai entre chaque dégât infligé par un ennemi
+                const damageCooldown = 1000; // 1 second delay between each damage inflicted by an enemy
                 if (now - e.lastDamageTime > damageCooldown) {
-                    takeDamage(e.damage); // Appel de takeDamage sans l'argument 'enemy'
-                    e.lastDamageTime = now; // Met à jour le dernier temps d'infliction de dégâts pour cet ennemi
+                    takeDamage(e.damage); // Calls takeDamage without the 'enemy' argument
+                    e.lastDamageTime = now; // Updates last damage inflicted time for this enemy
                 }
             }
             e.anim.timer++;
@@ -471,11 +472,11 @@
             }
         });
     }
-    // Gère la mort d'un ennemi
+    // Handles enemy death
     function killEnemy(enemy){
     enemy.isDead=true;
     gameState.killCount++;
-    if(Math.random()<0.8){ // 80% de chance de faire apparaître une gemme d'XP
+    if(Math.random()<0.8){ // 80% chance to spawn an XP gem
         const gemInfo = itemDefinitions.xpGem;
         xpGems.push({
             x:enemy.x+enemy.w/2,
@@ -483,36 +484,65 @@
             value:enemy.xp,
             anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
             frameCount: gemInfo.frameCount,
-            visualOffsetX: gemInfo.visualOffsetX, // Copie l'offset visuel
-            visualOffsetY: gemInfo.visualOffsetY  // Copie l'offset visuel
+            visualOffsetX: gemInfo.visualOffsetX, // Copies visual offset
+            visualOffsetY: gemInfo.visualOffsetY,  // Copies visual offset
+            expirationTime: Date.now() + 30000 // Gem disappears after 30 seconds (30000 ms)
         });
     }
     enemies=enemies.filter(en=>en!==enemy);
 }
-    // Met à jour les gemmes d'XP (animation, magnétisme, collection)
-    function updateXPGems() {for (let i=xpGems.length-1;i>=0;i--){const g=xpGems[i];g.anim.timer++;if(g.anim.timer>g.anim.speed){g.anim.timer=0;g.anim.frame=(g.anim.frame+1)%g.frameCount;}const dx=(player.x+player.w/2)-g.x;const dy=(player.y+player.h/2)-g.y;const d=Math.sqrt(dx*dx+dy*dy);if(d<player.magnetRadius){g.x+=(dx/d)*6;g.y+=(dy/d)*6;}if(d<player.w/2){collectXP(g.value);xpGems.splice(i,1);}}}
-    // Collecte l'XP et vérifie si le joueur monte de niveau
+    // Updates XP gems (animation, magnetism, collection, expiration)
+    function updateXPGems() {
+        const now = Date.now();
+        for (let i=xpGems.length-1;i>=0;i--){
+            const g=xpGems[i];
+
+            // Checks gem expiration
+            if (now >= g.expirationTime) {
+                xpGems.splice(i, 1);
+                continue; // Moves to next gem
+            }
+
+            g.anim.timer++;
+            if(g.anim.timer>g.anim.speed){
+                g.anim.timer=0;
+                g.anim.frame=(g.anim.frame+1)%g.frameCount;
+            }
+            const dx=(player.x+player.w/2)-g.x;
+            const dy=(player.y+player.h/2)-g.y;
+            const d=Math.sqrt(dx*dx+dy*dy);
+            if(d<player.magnetRadius){
+                g.x+=(dx/d)*6;
+                g.y+=(dy/d)*6;
+            }
+            if(d<player.w/2){
+                collectXP(g.value);
+                xpGems.splice(i,1);
+            }
+        }
+    }
+    // Collects XP and checks if player levels up
     function collectXP(amount){player.xp+=amount;if(player.xp>=player.xpToNextLevel){levelUp();}}
-    // Gère le passage de niveau du joueur
+    // Handles player leveling up
     function levelUp(){gameState.paused=true;player.level++;player.xp-=player.xpToNextLevel;player.xpToNextLevel=Math.floor(player.xpToNextLevel*1.5);player.health=player.maxHealth;levelUpModal.style.display='flex';populateUpgradeOptions();}
-    // Remplit les options d'amélioration
+    // Populates upgrade options
     function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
-    // Sélectionne une amélioration
+    // Selects an upgrade
     function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
     
-    // Gère les dégâts subis par le joueur
+    // Handles damage taken by the player
     function takeDamage(amount){ 
         const now = Date.now();
-        // Si le joueur est actuellement invincible, ne prend pas de dégâts
+        // If player is currently invincible, do not take damage
         if (player.invincible && now < player.invincibilityEndTime) {
             return;
         }
 
         player.health-=amount;
         
-        // Active l'invincibilité après avoir subi des dégâts
+        // Activates invincibility after taking damage
         player.invincible = true;
-        player.invincibilityEndTime = now + 1000; // Invincible pour 1 seconde (1000 ms)
+        player.invincibilityEndTime = now + 1000; // Invincible for 1 second (1000 ms)
 
         if(player.health<=0){
             player.health=0;
@@ -520,27 +550,59 @@
         }
     }
 
-    // Fonction pour mettre à jour l'état d'invincibilité du joueur
+    // Function to update player invincibility state
     function updatePlayerInvincibility() {
         const now = Date.now();
         if (player.invincible && now >= player.invincibilityEndTime) {
-            player.invincible = false; // Désactive l'invincibilité si le temps est écoulé
+            player.invincible = false; // Deactivates invincibility if time is up
         }
     }
 
-    // Gère la fin du jeu
+    // Handles game over
     function gameOver(){gameState.running=false;finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;gameOverModal.style.display='flex';}
     
-    // Fonction de victoire
+    // Victory function
     function gameVictory() {
         gameState.running = false;
         victoryModal.style.display = 'flex';
-        // Vous pouvez ajouter ici des informations spécifiques à la victoire, comme le temps final
+        // You can add victory-specific information here, like final time
     }
 
-    // Trouve l'ennemi le plus proche du joueur
-    function findNearestEnemy(){let n=null,nD=Infinity;enemies.forEach(e=>{const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<nD){nD=d;n=e;}});return n;}
-    // Met à jour l'interface utilisateur (UI)
+    // Function to check if an enemy is visible on screen
+    function isEnemyVisible(enemy) {
+        const enemyScreenX = enemy.x - camera.x;
+        const enemyScreenY = enemy.y - camera.y;
+
+        // Checks if enemy's bounding box (using sprite dimensions for visibility)
+        // overlaps with canvas bounding box (0,0,canvas.width,canvas.height)
+        return enemyScreenX < canvas.width && 
+               enemyScreenX + enemy.spriteW > 0 &&
+               enemyScreenY < canvas.height && 
+               enemyScreenY + enemy.spriteH > 0;
+    }
+
+    // Finds the nearest enemy to the player that is visible and within missile range
+    function findNearestEnemy(){
+        let nearest = null;
+        let minDistance = Infinity;
+        // Define missile range as half of canvas width
+        const missileRange = 500;
+
+        enemies.forEach(e=>{
+            // Calculate enemy distance from player
+            const distanceToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
+            
+            // Only consider visible enemies AND within range for magic missile targeting
+            if (isEnemyVisible(e) && distanceToPlayer <= missileRange) {
+                if(distanceToPlayer < minDistance){
+                    minDistance = distanceToPlayer;
+                    nearest = e;
+                }
+            }
+        });
+        return nearest;
+    }
+    // Updates user interface (UI)
     function updateUI(){
         levelUI.textContent=`Niveau: ${player.level}`;
         timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;
@@ -548,17 +610,33 @@
         healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;
         xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;
     }
-    // Met à jour les armes du joueur
-    function updateWeapons(){const now=Date.now();const mm=player.weapons.magicMissile;if(mm.level>0&&now-mm.lastShot>mm.cooldown){const target=findNearestEnemy();if(target){mm.lastShot=now;const dx=target.x-player.x;const dy=target.y-player.y;const angle=Math.atan2(dy,dx);projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan:100,angle:angle});}}
-    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
-    // Met à jour les projectiles
+    // Updates player weapons
+    function updateWeapons(){
+        const now=Date.now();
+        const mm=player.weapons.magicMissile;
+        if(mm.level>0 && now-mm.lastShot > mm.cooldown){
+            const target=findNearestEnemy(); // findNearestEnemy already checks visibility and range
+            if(target){ 
+                mm.lastShot=now;
+                const dx=target.x-player.x;
+                const dy=target.y-player.y;
+                const angle=Math.atan2(dy,dx);
+                // Lifespan adjusted to match half of canvas width at projectile speed
+                // Projectile speed is 8px per frame (assuming 60fps, but calculating based on distance).
+                // Distance = range (canvas.width / 2) / projectile_speed_per_frame
+                // If speed is 8, and range is say 600px (for a 1200px canvas), then 600/8 = 75 frames.
+                projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan: Math.ceil((canvas.width / 2) / 8),angle:angle});
+            }
+        }
+        const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
+    // Updates projectiles
     function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,getHitbox(e))){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
 
-    // Dessine la galerie de débogage pour les sprites
+    // Draws debug gallery for sprites
     function drawDebugGallery() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#444'; // Fond neutre pour la galerie
+        ctx.fillStyle = '#444'; // Neutral background for gallery
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = "12px 'Press Start 2P'";
         ctx.fillStyle = '#fff';
@@ -567,24 +645,24 @@
         let y = 50;
         const spacing = 200;
 
-        // Dessine le joueur (avec visualOffsetX/Y)
+        // Draws player (with visualOffsetX/Y)
         ctx.fillText("Player", x, y - 10);
         if (assets.player && assets.player.complete) {
             const sprite = assets.player;
             const frameWidth = sprite.naturalWidth / player.frameCount;
             const frameHeight = sprite.naturalHeight;
-            // Applique visualOffsetX et visualOffsetY ici
+            // Apply visualOffsetX and visualOffsetY here
             ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + player.visualOffsetX, y + player.visualOffsetY, player.spriteW, player.spriteH);
             if (debugMode) {
                 ctx.strokeStyle = 'rgba(255,0,0,0.8)';
                 ctx.lineWidth = 2;
-                // Hitbox reste à sa position logique (x, y) + offsets existants
+                // Hitbox remains at its logical position (x, y) + existing offsets
                 ctx.strokeRect(x + player.hitboxOffsetX, y + player.hitboxOffsetY, player.w, player.h);
             }
         }
         x += spacing;
 
-        // Dessine chaque ennemi (avec visualOffsetX/Y)
+        // Draws each enemy (with visualOffsetX/Y)
         for(const key in enemyDefinitions) {
             const def = enemyDefinitions[key];
             ctx.fillText(key, x, y - 10);
@@ -592,12 +670,12 @@
                 const sprite = assets[key];
                 const frameWidth = sprite.naturalWidth / def.frameCount;
                 const frameHeight = sprite.naturalHeight;
-                // Applique visualOffsetX et visualOffsetY ici
+                // Apply visualOffsetX and visualOffsetY here
                 ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + def.visualOffsetX, y + def.visualOffsetY, def.spriteW, def.spriteH);
                 if (debugMode) {
                     ctx.strokeStyle = 'rgba(255,0,0,0.8)';
                     ctx.lineWidth = 2;
-                    // Hitbox reste à sa position logique (x, y) + offsets existants
+                    // Hitbox remains at its logical position (x, y) + existing offsets
                     ctx.strokeRect(x + def.hitboxOffsetX, y + def.hitboxOffsetY, def.w, def.h);
                 }
             }
@@ -608,39 +686,52 @@
             }
         }
     }
-    // Fonction principale de dessin
+    // Main drawing function
     function draw(){
          if (debugGalleryMode) {
         drawDebugGallery();
-        return; // On arrête le dessin normal du jeu
+        return; // Stops normal game drawing
     }
         camera.x=player.x-canvas.width/2;camera.y=player.y-canvas.height/2;
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.save();
         ctx.translate(-camera.x,-camera.y);
 
-        // Dessine le fond répété
+        // Draws repeating background
         if(backgroundPattern) {
             ctx.fillStyle = backgroundPattern;
             ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
         }
 
-        // Dessine les obstacles
-        obstacles.forEach(o => { ctx.fillStyle = '#1a1a1a'; ctx.fillRect(o.x, o.y, o.w, o.h); });
+        // Draws obstacles with texture
+        obstacles.forEach(o => { 
+            if(assets.obstacle && assets.obstacle.complete) {
+                // Draw the obstacle image, scaling it to fit the obstacle's dimensions
+                ctx.drawImage(assets.obstacle, o.x, o.y, o.w, o.h);
+            } else {
+                ctx.fillStyle = '#1a1a1a'; // Fallback color if image not loaded
+                ctx.fillRect(o.x, o.y, o.w, o.h);
+            }
+            if(debugMode) { // Draw hitbox in debug mode
+                ctx.strokeStyle = 'rgba(0,0,255,0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(o.x, o.y, o.w, o.h);
+            }
+        });
         
-        // Dessine les gemmes d'XP (avec visualOffsetX/Y)
+        // Draws XP gems (with visualOffsetX/Y)
         xpGems.forEach(gem => { 
             if(assets.xpGem && assets.xpGem.complete && assets.xpGem.naturalHeight !== 0) {
                 const sprite = assets.xpGem;
                 const frameWidth = sprite.naturalWidth / gem.frameCount;
                 const frameHeight = sprite.naturalHeight;
                 const sourceX = gem.anim.frame * frameWidth;
-                // Applique visualOffsetX et visualOffsetY ici
+                // Apply visualOffsetX and visualOffsetY here
                 ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16 + gem.visualOffsetX, gem.y - 16 + gem.visualOffsetY, 32, 32); 
             }
         });
         
-        // Dessine les ennemis et leurs barres de vie (avec visualOffsetX/Y)
+        // Draws enemies and their health bars (with visualOffsetX/Y)
         enemies.forEach(e => {
             if(assets[e.type]) {
                 const sprite = assets[e.type];
@@ -648,9 +739,9 @@
                     const frameWidth = sprite.naturalWidth / e.frameCount;
                     const frameHeight = sprite.naturalHeight;
                     const sourceX = e.anim.frame * frameWidth;
-                    // Applique visualOffsetX et visualOffsetY ici
+                    // Apply visualOffsetX and visualOffsetY here
                     ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, e.x + e.visualOffsetX, e.y + e.visualOffsetY, e.spriteW, e.spriteH);
-                    if(debugMode) { // Dessine la hitbox en mode débogage
+                    if(debugMode) { // Draws hitbox in debug mode
                         ctx.strokeStyle = 'rgba(255,0,0,0.5)';
                         ctx.lineWidth = 2;
                         const hitbox = getHitbox(e);
@@ -658,17 +749,17 @@
                     }
                 }
             }
-            // Dessine la barre de vie de l'ennemi (sa position est liée à la hitbox, pas à l'offset visuel)
+            // Draws enemy health bar (its position is linked to hitbox, not visual offset)
             if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
         });
     
-        // Dessine le joueur avec un flip horizontal si nécessaire (avec visualOffsetX/Y)
+        // Draws player with horizontal flip if necessary (with visualOffsetX/Y)
         ctx.save();
-        // Calcule la position de base du sprite (avant offset visuel)
+        // Calculates base sprite position (before visual offset)
         const currentSpriteX = player.x - (player.spriteW - player.w) / 2 + player.hitboxOffsetX;
         const currentSpriteY = player.y - (player.spriteH - player.h) / 2 + player.hitboxOffsetY;
 
-        // Applique la translation pour la rotation/flip, en incluant l'offset visuel
+        // Applies translation for rotation/flip, including visual offset
         ctx.translate(currentSpriteX + player.visualOffsetX + player.spriteW / 2, currentSpriteY + player.visualOffsetY + player.spriteH / 2);
         if (!player.anim.facingRight) { ctx.scale(-1, 1); }
         if(assets.player && assets.player.complete && assets.player.naturalHeight !== 0) {
@@ -676,16 +767,16 @@
             const frameWidth = sprite.naturalWidth / player.frameCount;
             const frameHeight = sprite.naturalHeight;
             const sourceX = player.anim.frame * frameWidth;
-            // Si le joueur est invincible, on le fait clignoter
-            if (player.invincible && Date.now() % 200 < 100) { // Clignote toutes les 100ms
-                ctx.globalAlpha = 0.5; // Rend le joueur semi-transparent
+            // If player is invincible, make them blink
+            if (player.invincible && Date.now() % 200 < 100) { // Blinks every 100ms
+                ctx.globalAlpha = 0.5; // Makes player semi-transparent
             }
             ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.spriteH / 2, player.spriteW, player.spriteH);
-            ctx.globalAlpha = 1.0; // Réinitialise l'opacité
+            ctx.globalAlpha = 1.0; // Resets opacity
         }
         ctx.restore();
         
-        // Dessine la hitbox du joueur en mode débogage (sa position est logique, sans offset visuel)
+        // Draws player hitbox in debug mode (its position is logical, without visual offset)
         if(debugMode) {
             ctx.strokeStyle = 'rgba(255,0,0,0.5)';
             ctx.lineWidth = 2;
@@ -693,34 +784,34 @@
             ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
         }
 
-        // Dessine l'aura de décomposition
+        // Draws decay aura
         const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();;}
-        // Dessine les projectiles
+        // Draws projectiles
         projectiles.forEach(p=>{ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);ctx.fill();});
-        // Dessine les orbes d'aura
+        // Draws aura orbs
         const aura=player.weapons.aura;if(aura.level>0){const orbW=24,orbH=24;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
         
         ctx.restore();
     }
 
     let lastTime = 0;
-    // Fonction pour mettre à jour la régénération du joueur
+    // Function to update player regeneration
     function updatePlayerRegeneration(deltaTime) {
         if (player.regenerationRate > 0) {
-            // S'assurer que deltaTime est non-négatif.
+            // Ensure deltaTime is non-negative.
             const safeDeltaTime = Math.max(0, deltaTime);
-            // deltaTime est en millisecondes, regenerationRate est en PV par seconde
+            // deltaTime is in milliseconds, regenerationRate is in HP per second
             const healthToRegen = (player.regenerationRate * safeDeltaTime) / 1000;
             
-            // La régénération ajoute de la vie. Math.min s'assure de ne pas dépasser la vie maximale.
+            // Regeneration adds health. Math.min ensures not exceeding max health.
             player.health = Math.min(player.maxHealth, player.health + healthToRegen);
         }
     }
 
-    // Boucle de jeu principale
+    // Main game loop
     function gameLoop(timestamp){
         if(!gameState.running) {
-            requestAnimationFrame(gameLoop); // Continue de dessiner le menu principal ou pause
+            requestAnimationFrame(gameLoop); // Continues drawing main menu or pause
             return;
         }
         const deltaTime=timestamp-lastTime;
@@ -732,15 +823,15 @@
             updateWeapons();
             updateProjectiles();
             updateXPGems();
-            updatePlayerRegeneration(deltaTime); // Appel de la fonction de régénération
-            updatePlayerInvincibility(); // Met à jour l'état d'invincibilité
+            updatePlayerRegeneration(deltaTime); // Calls regeneration function
+            updatePlayerInvincibility(); // Updates invincibility state
             gameState.gameTime+=deltaTime;
 
-            // Vérifie la condition de victoire (30 minutes = 1800000 millisecondes)
+            // Checks victory condition (30 minutes = 1800000 milliseconds)
             const thirtyMinutesInMs = 30 * 60 * 1000;
             if (gameState.gameTime >= thirtyMinutesInMs) {
                 gameVictory();
-                return; // Arrête le traitement de la logique de jeu après la victoire
+                return; // Stops processing game logic after victory
             }
         }
         draw();
@@ -748,60 +839,60 @@
         requestAnimationFrame(gameLoop);
     }
     
-    // Fonction pour démarrer le jeu
+    // Function to start the game
     function startGame() {
-        mainMenu.style.display = 'none'; // Cache le menu principal
+        mainMenu.style.display = 'none'; // Hides main menu
         gameState.gameStarted = true;
         gameState.running = true;
         gameState.paused = false;
-        lastTime = performance.now(); // Réinitialise le temps pour un démarrage propre de la boucle de jeu
-        requestAnimationFrame(gameLoop); // Démarre la boucle de jeu
+        lastTime = performance.now(); // Resets time for a clean game loop start
+        requestAnimationFrame(gameLoop); // Starts game loop
     }
 
-    // Fonction pour mettre le jeu en pause
+    // Function to pause the game
     function pauseGame() {
         gameState.paused = true;
         pauseModal.style.display = 'flex';
-        populatePauseStats(); // Met à jour les stats dans le menu pause
+        populatePauseStats(); // Updates stats in pause menu
     }
 
-    // Fonction pour reprendre le jeu
+    // Function to resume the game
     function resumeGame() {
         gameState.paused = false;
         pauseModal.style.display = 'none';
-        lastTime = performance.now(); // Réinitialise le temps pour éviter un grand deltaTime après la pause
+        lastTime = performance.now(); // Resets time to avoid large deltaTime after pause
     }
 
-    // Fonction pour remplir les statistiques du menu pause
+    // Function to populate pause menu statistics
     function populatePauseStats() {
         pauseLevelUI.textContent = `Niveau: ${player.level}`;
         pauseTimerUI.textContent = `Temps écoulé: ${Math.floor(gameState.gameTime/1000)}s`;
         pauseKillCountUI.textContent = `Kills: ${gameState.killCount}`;
 
-        pauseUpgradesList.innerHTML = ''; // Nettoie la liste
+        pauseUpgradesList.innerHTML = ''; // Cleans list
 
-        // Stocke les améliorations choisies et leurs niveaux/valeurs actuelles
+        // Stores selected upgrades and their current levels/values
         const currentUpgrades = {};
 
-        // Collecte les niveaux des armes
+        // Collects weapon levels
         for (const weaponId in player.weapons) {
             if (player.weapons[weaponId].level > 0) {
                 currentUpgrades[weaponId] = player.weapons[weaponId].level;
             }
         }
 
-        // Collecte les autres augmentations de statistiques
+        // Collects other stat boosts
         if (player.maxHealth > 120) {
-            currentUpgrades.maxHealth = (player.maxHealth - 120) / 20; // Nombre de fois amélioré
+            currentUpgrades.maxHealth = (player.maxHealth - 120) / 20; // Number of times upgraded
         }
         if (player.speed > 4) {
-            currentUpgrades.speed = (player.speed - 4) / 0.5; // Nombre de fois amélioré
+            currentUpgrades.speed = (player.speed - 4) / 0.5; // Number of times upgraded
         }
         if (player.regenerationRate > 0) {
-            currentUpgrades.regeneration = player.regenerationRate / 0.5; // Nombre de fois amélioré
+            currentUpgrades.regeneration = player.regenerationRate / 0.5; // Number of times upgraded
         }
 
-        // Mappe les IDs des améliorations aux noms d'affichage et à la logique
+        // Maps upgrade IDs to display names and logic
         const upgradeDisplayNames = {
             magicMissile: "Missile Magique",
             aura: "Orbes de Feu",
@@ -811,7 +902,7 @@
             regeneration: "Régénération"
         };
 
-        // Remplit la liste en fonction des améliorations collectées
+        // Populates list based on collected upgrades
         for (const upgradeId in currentUpgrades) {
             const li = document.createElement('li');
             const level = currentUpgrades[upgradeId];
@@ -822,7 +913,7 @@
             } else if (upgradeId === 'maxHealth') {
                 li.textContent = `${displayName}: +${player.maxHealth - 120} Vie Max`;
             } else if (upgradeId === 'speed') {
-                li.textContent = `${displayName}: +${(player.speed - 4).toFixed(1)} Vitesse`; // Utilisez toFixed pour la vitesse
+                li.textContent = `${displayName}: +${(player.speed - 4).toFixed(1)} Vitesse`; // Use toFixed for speed
             } else {
                 li.textContent = `${displayName}: Niveau ${level}`;
             }
@@ -831,33 +922,33 @@
     }
 
 
-    // Fonction d'initialisation du jeu
+    // Game initialization function
     function init(){
-        // Initialise l'interface utilisateur
+        // Initializes user interface
         document.getElementById('ui-container').innerHTML=`<div id="stats"><div id="level">Niveau: 1</div><div id="timer">Temps: 0s</div><div id="kill-count">Kills: 0</div></div><div id="xp-bar-container"><div id="xp-bar" style="width: 0%;"></div></div><div id="health-bar-container"><div id="health-bar" style="width: 100%;"></div></div>`;
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
         levelUI=document.getElementById('level');timerUI=document.getElementById('timer');killCountUI=document.getElementById('kill-count');healthBarUI=document.getElementById('health-bar');xpBarUI=document.getElementById('xp-bar');levelUpModal=document.getElementById('level-up-modal');upgradeOptionsContainer=document.getElementById('upgrade-options');gameOverModal=document.getElementById('game-over-modal');finalScoreUI=document.getElementById('final-score');
         
-        // Références aux éléments du menu pause
+        // References to pause menu elements
         pauseLevelUI = document.getElementById('pause-level');
         pauseTimerUI = document.getElementById('pause-timer');
         pauseKillCountUI = document.getElementById('pause-kill-count');
         pauseUpgradesList = document.getElementById('pause-upgrades-list');
 
-        // Redimensionne le canvas et crée les obstacles
+        // Resizes canvas and creates obstacles
         resizeCanvas();
         createBackgroundAndObstacles();
 
-        // Charge les assets et démarre la boucle de jeu une fois tout chargé
+        // Loads assets and starts game loop once everything is loaded
         loadAssets(() => {
             backgroundPattern = ctx.createPattern(assets.background, 'repeat');
-            // Nous n'appelons plus gameLoop ici directement, mais dans startGame()
-            // Cependant, nous devons appeler draw() une fois pour afficher le menu principal
+            // We no longer call gameLoop here directly, but in startGame()
+            // However, we must call draw() once to display the main menu
             draw(); 
         });
     }
 
-    // Appelle la fonction d'initialisation pour démarrer le jeu
+    // Calls initialization function to start the game
     init();
 </script>
 </body>
