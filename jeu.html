@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D&D Survivors</title>
+    <title>Fantasy Survivors</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
             padding: 0;
             background-color: #1a1a1a;
             color: #fff;
-            font-family: 'Press+Start+2P',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+            font-family: 'Press Start 2P',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
             display: flex;
             justify-content: center;
             align-items: center;
@@ -94,7 +94,7 @@
             border-radius: 5px;
         }
         .upgrade-option:hover { background-color: #f1c40f; color: #1a1a1a; }
-        #game-over-modal button {
+        #game-over-modal button, #main-menu button {
             font-family: 'Press Start 2P', cursive;
             font-size: 16px;
             padding: 15px 30px;
@@ -105,18 +105,56 @@
             margin-top: 20px;
             border-radius: 5px;
         }
+
+        /* Styles du menu principal */
+        #main-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20; /* Assurez-vous qu'il est au-dessus de tout le reste */
+        }
+        #main-menu h1 {
+            font-size: 48px;
+            color: #f1c40f;
+            margin-bottom: 40px;
+            text-shadow: 4px 4px 0px #e67e22;
+        }
+        #main-menu p {
+            font-size: 24px;
+            color: #fff;
+            margin-top: 20px;
+            animation: pulse 1.5s infinite alternate; /* Animation de pulsation */
+        }
+        @keyframes pulse {
+            from { transform: scale(1); opacity: 1; }
+            to { transform: scale(1.05); opacity: 0.8; }
+        }
     </style>
 </head>
 <body>
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container"></div>
+    <!-- Menu principal ajouté ici -->
+    <div id="main-menu">
+        <h1>Fantasy Survivors</h1>
+        <p>APPUYEZ SUR N'IMPORTE QUELLE TOUCHE POUR COMMENCER</p>
+    </div>
 </div>
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const gameContainer = document.getElementById('game-container');
     const uiContainer = document.getElementById('ui-container');
+    const mainMenu = document.getElementById('main-menu'); // Référence au menu principal
 
     // --- Asset Loading ---
     const assets = {};
@@ -171,7 +209,7 @@
     let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI,
         levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI;
     // État du jeu
-    let gameState = { running: true, paused: false, gameTime: 0, killCount: 0 };
+    let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Ajout de gameStarted
     // État des touches du clavier
     let keys = {};
     // Modes de débogage
@@ -214,6 +252,10 @@
     
     // Gère les événements d'appui et de relâchement des touches
     document.addEventListener('keydown', (e) => { 
+        if (!gameState.gameStarted) { // Si le jeu n'a pas commencé, n'importe quelle touche le démarre
+            startGame();
+            return; // Sort de la fonction pour éviter de traiter la touche pour le mouvement
+        }
         keys[e.key.toLowerCase()] = true; 
         if (e.key.toLowerCase() === 'h') {
             debugMode = !debugMode; // Active/désactive le mode débogage
@@ -437,8 +479,37 @@
 
     let lastTime = 0;
     // Boucle de jeu principale
-    function gameLoop(timestamp){if(!gameState.running)return;const deltaTime=timestamp-lastTime;lastTime=timestamp;if(!gameState.paused && !debugGalleryMode){updatePlayer();spawnEnemies();updateEnemies();updateWeapons();updateProjectiles();updateXPGems();gameState.gameTime+=deltaTime;}draw();updateUI();requestAnimationFrame(gameLoop);}
+    function gameLoop(timestamp){
+        if(!gameState.running) {
+            requestAnimationFrame(gameLoop); // Continue de dessiner le menu principal
+            return;
+        }
+        const deltaTime=timestamp-lastTime;
+        lastTime=timestamp;
+        if(!gameState.paused && !debugGalleryMode){
+            updatePlayer();
+            spawnEnemies();
+            updateEnemies();
+            updateWeapons();
+            updateProjectiles();
+            updateXPGems();
+            gameState.gameTime+=deltaTime;
+        }
+        draw();
+        updateUI();
+        requestAnimationFrame(gameLoop);
+    }
     
+    // Fonction pour démarrer le jeu
+    function startGame() {
+        mainMenu.style.display = 'none'; // Cache le menu principal
+        gameState.gameStarted = true;
+        gameState.running = true;
+        gameState.paused = false;
+        lastTime = performance.now(); // Réinitialise le temps pour un démarrage propre de la boucle de jeu
+        requestAnimationFrame(gameLoop); // Démarre la boucle de jeu
+    }
+
     // Fonction d'initialisation du jeu
     function init(){
         // Initialise l'interface utilisateur
@@ -453,7 +524,9 @@
         // Charge les assets et démarre la boucle de jeu une fois tout chargé
         loadAssets(() => {
             backgroundPattern = ctx.createPattern(assets.background, 'repeat');
-            requestAnimationFrame(gameLoop);
+            // Nous n'appelons plus gameLoop ici directement, mais dans startGame()
+            // Cependant, nous devons appeler draw() une fois pour afficher le menu principal
+            draw(); 
         });
     }
 
