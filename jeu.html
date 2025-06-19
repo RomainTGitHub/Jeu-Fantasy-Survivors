@@ -310,7 +310,18 @@
     player.frameCount = 4; // Number of frames for player animation
     // Available upgrades when leveling up
     const availableUpgrades=[
-        {id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1200-w.level*100);w.damage+=5;}},
+        {
+            id:'magicMissile',
+            name:'Missile Magique',
+            description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,
+            apply:()=>{
+                const w=player.weapons.magicMissile;
+                w.level++;
+                // Decrease cooldown by 5% (increase fire rate)
+                w.cooldown=Math.max(500, w.cooldown * 0.95); // Reduce cooldown by 5%
+                w.damage+=5;
+            }
+        },
         {id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
         {id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},
         {id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},
@@ -338,12 +349,16 @@
         keys[e.key.toLowerCase()] = true; 
 
         if (e.key.toLowerCase() === 'escape') { // Handles Escape key for pause
+            console.log('Escape key pressed.');
+            console.log('Current gameState.paused:', gameState.paused);
             if (gameState.running && !debugGalleryMode) { // Do not pause if game is already over or in debug gallery mode
                 if (gameState.paused) {
-                    pauseGame();
-                } else {
                     resumeGame();
+                } else {
+                    pauseGame();
                 }
+            } else {
+                console.log('Pause blocked: gameState.running:', gameState.running, 'debugGalleryMode:', debugGalleryMode);
             }
         }
         
@@ -851,6 +866,7 @@
 
     // Function to pause the game
     function pauseGame() {
+        console.log('pauseGame() called. Setting pauseModal display to flex.');
         gameState.paused = true;
         pauseModal.style.display = 'flex';
         populatePauseStats(); // Updates stats in pause menu
@@ -858,6 +874,7 @@
 
     // Function to resume the game
     function resumeGame() {
+        console.log('resumeGame() called. Setting pauseModal display to none.');
         gameState.paused = false;
         pauseModal.style.display = 'none';
         lastTime = performance.now(); // Resets time to avoid large deltaTime after pause
