@@ -358,7 +358,7 @@
         background: 'images/background.png',
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
-        magicMissileSound: 'soundeffect/magicprojectile.mp3' // Added magic missile sound path
+        magicMissileSound: 'sounds/magic_missile.mp3' // Added magic missile sound path
     };
 
     // Loads all images defined in assetSources
@@ -1809,6 +1809,11 @@
             showCustomAutoplayAlert();
             toggleMusicButton.textContent = "Musique: OFF"; // Reflect current state
             isMusicOn = false; // Set music state to off if autoplay failed
+        });
+
+        // Disable right-click context menu on the game container
+        gameContainer.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevents the default right-click context menu
         });
     });
 </script>
