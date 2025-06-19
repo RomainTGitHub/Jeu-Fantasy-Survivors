@@ -756,10 +756,23 @@
         });
         return nearest;
     }
+    // Formats time in MM:SS:ms format
+    function formatTime(milliseconds) {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const ms = Math.floor((milliseconds % 1000) / 10); // Get milliseconds to two digits
+
+        const pad = (num) => String(num).padStart(2, '0');
+        const padMs = (num) => String(num).padStart(2, '0'); // For milliseconds
+
+        return `${pad(minutes)}:${pad(seconds)}:${padMs(ms)}`;
+    }
+
     // Updates user interface (UI)
     function updateUI(){
         levelUI.textContent=`Niveau: ${player.level}`;
-        timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;
+        timerUI.textContent=`Temps: ${formatTime(gameState.gameTime)}`; // Updated to use formatTime
         killCountUI.textContent=`Kills: ${gameState.killCount}`;
         healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;
         xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;
@@ -1234,7 +1247,7 @@
     // Function to populate pause menu statistics
     function populatePauseStats() {
         pauseLevelUI.textContent = `Niveau: ${player.level}`;
-        pauseTimerUI.textContent = `Temps écoulé: ${Math.floor(gameState.gameTime/1000)}s`;
+        pauseTimerUI.textContent = `Temps écoulé: ${formatTime(gameState.gameTime)}`; // Updated to use formatTime
         pauseKillCountUI.textContent = `Kills: ${gameState.killCount}`;
 
         pauseUpgradesList.innerHTML = ''; // Cleans list
