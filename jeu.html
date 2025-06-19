@@ -166,12 +166,18 @@
         levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI;
     let gameState = { running: true, paused: false, gameTime: 0, killCount: 0 };
     let keys = {};
+    let debugMode = false; // <-- DEBUG MODE
     let camera = { x: 0, y: 0 };
     let projectiles = [], enemies = [], xpGems = [];
     let enemySpawnTimer = 0;
 
-    const player = {x:world.width/2,y:world.height/2,w:128,h:160,speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},};
-    const enemyDefinitions={goblin:{type:'goblin',w:128,h:160,speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},skeleton:{type:'skeleton',w:64,h:80,speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},slime:{type:'slime',w:100,h:80,speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},orc:{type:'orc',w:128,h:160,speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},};
+    const player = {x:world.width/2,y:world.height/2, w: 40, h: 120, spriteW: 128, spriteH: 160, speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},auraOfDecay:{level:0,radius:120,damage:2,cooldown:500,lastTick:0}},};
+    const enemyDefinitions={
+        goblin:{type:'goblin',w:50,h:100,spriteW:128,spriteH:160,speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
+        skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80,speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
+        slime:{type:'slime',w:80,h:60,spriteW:100,spriteH:80,speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
+        orc:{type:'orc',w:90,h:120,spriteW:128,spriteH:160,speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
+    };
     const itemDefinitions = {xpGem: { frameCount: 7, animSpeed: 10 },};
     player.frameCount = 4; // Add frame count for player
     const availableUpgrades=[{id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1200-w.level*100);w.damage+=5;}},{id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},{id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},{id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},{id:'speed',name:'Bottes de vitesse',description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5;}}];
@@ -179,7 +185,15 @@
     function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
     
     function resizeCanvas(){canvas.width=gameContainer.clientWidth;canvas.height=gameContainer.clientHeight;}
-    window.addEventListener('resize',resizeCanvas);document.addEventListener('keydown',(e)=>{keys[e.key.toLowerCase()]=true;});document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
+    
+    document.addEventListener('keydown', (e) => { 
+        keys[e.key.toLowerCase()] = true; 
+        if (e.key.toLowerCase() === 'h') {
+            debugMode = !debugMode;
+        }
+    });
+    document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
+
     function checkCollision(r1,r2){return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;}
     function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
     
@@ -196,7 +210,6 @@
             x:enemy.x+enemy.w/2,
             y:enemy.y+enemy.h/2,
             value:enemy.xp,
-            // On ajoute les propriétés d'animation
             anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
             frameCount: gemInfo.frameCount
         });
@@ -206,15 +219,11 @@
     function updateXPGems() {
     for (let i = xpGems.length - 1; i >= 0; i--) {
         const g = xpGems[i];
-        
-        // Animation
         g.anim.timer++;
         if (g.anim.timer > g.anim.speed) {
             g.anim.timer = 0;
             g.anim.frame = (g.anim.frame + 1) % g.frameCount;
         }
-
-        // Mouvement vers le joueur
         const dx = (player.x + player.w / 2) - g.x;
         const dy = (player.y + player.h / 2) - g.y;
         const d = Math.sqrt(dx * dx + dy * dy);
@@ -261,8 +270,6 @@
             const frameWidth = sprite.naturalWidth / gem.frameCount;
             const frameHeight = sprite.naturalHeight;
             const sourceX = gem.anim.frame * frameWidth;
-            
-            // On dessine la bonne frame de la spritesheet
             ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16, gem.y - 16, 32, 32); 
         }
     });
@@ -274,7 +281,12 @@
                     const frameWidth = sprite.naturalWidth / e.frameCount;
                     const frameHeight = sprite.naturalHeight;
                     const sourceX = e.anim.frame * frameWidth;
-                    ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, e.x, e.y, e.w, e.h);
+                    ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, e.x, e.y, e.spriteW, e.spriteH);
+                    if(debugMode) {
+                        ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(e.x, e.y, e.w, e.h);
+                    }
                 }
             }
             if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x,e.y-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x,e.y-8,e.w*(e.currentHealth/e.health),4);}
@@ -288,7 +300,12 @@
             const frameWidth = sprite.naturalWidth / player.frameCount;
             const frameHeight = sprite.naturalHeight;
             const sourceX = player.anim.frame * frameWidth;
-            ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.w / 2, -player.h / 2, player.w, player.h);
+            ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.spriteH / 2, player.spriteW, player.spriteH);
+            if(debugMode) {
+                ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-player.w / 2, -player.h / 2, player.w, player.h);
+            }
         }
         ctx.restore();
 
