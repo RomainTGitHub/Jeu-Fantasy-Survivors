@@ -56,6 +56,7 @@
             border-radius: 5px;
             margin-top: 10px;
             overflow: hidden;
+            position: relative; /* Added for absolute positioning of bar-text */
         }
         #health-bar {
             height: 100%;
@@ -67,6 +68,24 @@
         }
         #health-bar { background-color: #c0392b; }
         #xp-bar { background-color: #2980b9; }
+
+        /* Styles for text on bars */
+        .bar-text {
+            position: absolute;
+            top: 0; /* Explicitly position at the top */
+            left: 0; /* Explicitly position at the left */
+            width: 100%;
+            height: 100%; /* Make it take full height of parent */
+            display: flex; /* Use flexbox for centering */
+            align-items: center; /* Vertically center */
+            justify-content: center; /* Horizontally center */
+            font-size: 14px;
+            color: #fff;
+            text-shadow: 1px 1px 1px #000;
+            pointer-events: none; /* Ensure it doesn't block clicks */
+            z-index: 1; /* Ensure it's above the bar but below other UI */
+        }
+
         .modal {
             position: absolute;
             top: 0; left: 0;
@@ -269,7 +288,7 @@
     const world = { width: 3000, height: 3000 };
     let obstacles = [], backgroundPattern;
     // User interface elements
-    let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI,
+    let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI, healthTextUI, xpTextUI, // Added healthTextUI, xpTextUI
         levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
         pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // New UI elements for pause
     // Game state
@@ -632,6 +651,10 @@
         killCountUI.textContent=`Kills: ${gameState.killCount}`;
         healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;
         xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;
+        
+        // Update text content for health and XP bars
+        healthTextUI.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
+        xpTextUI.textContent = `${Math.floor(player.xp)}/${player.xpToNextLevel}`;
     }
     // Updates player weapons
     function updateWeapons(){
@@ -652,7 +675,7 @@
             }
         }
         const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dx);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
     // Updates projectiles
     function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,getHitbox(e))){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
 
@@ -771,7 +794,7 @@
                         ctx.strokeStyle = 'rgba(255,0,0,0.5)';
                         ctx.lineWidth = 2;
                         const hitbox = getHitbox(e);
-                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.h);
                     }
                 }
             }
@@ -953,9 +976,35 @@
     // Game initialization function
     function init(){
         // Initializes user interface
-        document.getElementById('ui-container').innerHTML=`<div id="stats"><div id="level">Niveau: 1</div><div id="timer">Temps: 0s</div><div id="kill-count">Kills: 0</div></div><div id="xp-bar-container"><div id="xp-bar" style="width: 0%;"></div></div><div id="health-bar-container"><div id="health-bar" style="width: 100%;"></div></div>`;
+        document.getElementById('ui-container').innerHTML=`
+            <div id="stats">
+                <div id="level">Niveau: 1</div>
+                <div id="timer">Temps: 0s</div>
+                <div id="kill-count">Kills: 0</div>
+            </div>
+            <div id="xp-bar-container">
+                <div id="xp-bar" style="width: 0%;"></div>
+                <span id="xp-text" class="bar-text">0/8</span>
+            </div>
+            <div id="health-bar-container">
+                <div id="health-bar" style="width: 100%;"></div>
+                <span id="health-text" class="bar-text">120/120</span>
+            </div>
+        `;
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
-        levelUI=document.getElementById('level');timerUI=document.getElementById('timer');killCountUI=document.getElementById('kill-count');healthBarUI=document.getElementById('health-bar');xpBarUI=document.getElementById('xp-bar');levelUpModal=document.getElementById('level-up-modal');upgradeOptionsContainer=document.getElementById('upgrade-options');gameOverModal=document.getElementById('game-over-modal');finalScoreUI=document.getElementById('final-score');
+        
+        // Get references to UI elements
+        levelUI=document.getElementById('level');
+        timerUI=document.getElementById('timer');
+        killCountUI=document.getElementById('kill-count');
+        healthBarUI=document.getElementById('health-bar');
+        xpBarUI=document.getElementById('xp-bar');
+        healthTextUI=document.getElementById('health-text'); // Get reference for health text
+        xpTextUI=document.getElementById('xp-text');     // Get reference for XP text
+        levelUpModal=document.getElementById('level-up-modal');
+        upgradeOptionsContainer=document.getElementById('upgrade-options');
+        gameOverModal=document.getElementById('game-over-modal');
+        finalScoreUI=document.getElementById('final-score');
         
         // References to pause menu elements
         pauseLevelUI = document.getElementById('pause-level');
