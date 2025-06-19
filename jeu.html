@@ -57,7 +57,11 @@
             margin-top: 10px;
             overflow: hidden;
         }
-        #health-bar, #xp-bar {
+        #health-bar {
+            height: 100%;
+            /* Supprimé: transition: width 0.2s ease-in-out; */
+        }
+        #xp-bar {
             height: 100%;
             transition: width 0.2s ease-in-out;
         }
@@ -94,7 +98,7 @@
             border-radius: 5px;
         }
         .upgrade-option:hover { background-color: #f1c40f; color: #1a1a1a; }
-        #game-over-modal button, #main-menu button, #pause-modal button { /* Ajout du bouton pause */
+        #game-over-modal button, #main-menu button, #pause-modal button, #victory-modal button { /* Ajout des boutons de modal */
             font-family: 'Press Start 2P', cursive;
             font-size: 16px;
             padding: 15px 30px;
@@ -196,6 +200,14 @@
             <button onclick="resumeGame()">Reprendre</button>
         </div>
     </div>
+    <!-- Écran de Victoire -->
+    <div id="victory-modal" class="modal">
+        <div class="modal-content">
+            <h2>VICTOIRE !</h2>
+            <p>Vous avez survécu 30 minutes !</p>
+            <button onclick="window.location.reload()">Recommencer</button>
+        </div>
+    </div>
 </div>
 <script>
     const canvas = document.getElementById('gameCanvas');
@@ -204,6 +216,7 @@
     const uiContainer = document.getElementById('ui-container');
     const mainMenu = document.getElementById('main-menu'); // Référence au menu principal
     const pauseModal = document.getElementById('pause-modal'); // Référence au menu pause
+    const victoryModal = document.getElementById('victory-modal'); // Référence à la modal de victoire
 
     // --- Asset Loading ---
     const assets = {};
@@ -276,6 +289,9 @@
         x:world.width/2,y:world.height/2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
         visualOffsetX: 0, visualOffsetY: -10, // Nouveaux offsets pour le rendu visuel
         speed:4,health:120,maxHealth:120,xp:0,level:1,xpToNextLevel:8,magnetRadius:100,
+        regenerationRate: 0, // Nouveau: points de vie par seconde à régénérer
+        invincible: false, // Nouveau: état d'invincibilité du joueur
+        invincibilityEndTime: 0, // Nouveau: temps de fin de l'invincibilité
         anim:{frame:0, timer:0, speed: 15, isMoving:false,facingRight:true},
         weapons:{magicMissile:{level:1,cooldown:1200,lastShot:0,damage:12},
         aura:{level:0,radius:80,damage:5,cooldown:100,lastTick:0,rotation:0,orbCount:0},
@@ -292,7 +308,19 @@
     const itemDefinitions = {xpGem: { frameCount: 7, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 },};
     player.frameCount = 4; // Nombre de frames pour l'animation du joueur
     // Améliorations disponibles lors du passage de niveau
-    const availableUpgrades=[{id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1200-w.level*100);w.damage+=5;}},{id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},{id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},{id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},{id:'speed',name:'Bottes de vitesse',description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5;}}];
+    const availableUpgrades=[
+        {id:'magicMissile',name:'Missile Magique',description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,apply:()=>{const w=player.weapons.magicMissile;w.level++;w.cooldown=Math.max(500,1200-w.level*100);w.damage+=5;}},
+        {id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
+        {id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},
+        {id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},
+        {id:'speed',name:'Bottes de vitesse',description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5;}},
+        {
+            id:'regeneration',
+            name:'Régénération',
+            description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description pour l'amélioration
+            apply:()=>{player.regenerationRate+=0.5;}
+        }
+    ];
 
     // Crée le fond et les obstacles du monde
     function createBackgroundAndObstacles(){obstacles=[];obstacles.push({x:-10,y:0,w:10,h:world.height},{x:world.width,y:0,w:10,h:world.height},{x:0,y:-10,w:world.width,h:10},{x:0,y:world.height,w:world.width,h:10});const pW=120,pH=160;const pP=[{x:500,y:500},{x:2500,y:500},{x:500,y:2500},{x:2500,y:2500},{x:1500,y:1000},{x:1500,y:2000}];pP.forEach(p=>{obstacles.push({x:p.x,y:p.y,w:pW,h:pH});});}
@@ -344,13 +372,105 @@
     function checkCollisionWithObjects(rect,list){for(const o of list)if(checkCollision(rect,o))return true;return false;}
     
     // Met à jour la position et l'animation du joueur
-    function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nextPos = getHitbox(player);nextPos.x += mx;if(!checkCollisionWithObjects(nextPos,obstacles))player.x+=mx;nextPos.x -= mx;nextPos.y += my;if(!checkCollisionWithObjects(nextPos,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
+    function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,dy=0;if(keys['w']||keys['z'])dy-=1;if(keys['s'])dy+=1;if(keys['a']||keys['q'])dx-=1;if(keys['d'])dx+=1;player.anim.isMoving=(dx!==0||dy!==0);if(player.anim.isMoving){if(dx!==0)player.anim.facingRight=dx>0;const m=Math.sqrt(dx*dx+dy*dy);const mx=(dx/m)*player.speed;const my=(dy/m)*player.speed;const nextPos = getHitbox(player);nextPos.x += mx;if(!checkCollisionWithObjects(nextPos,obstacles))player.x+=mx;nextPos.x-=mx;nextPos.y+=my;if(!checkCollisionWithObjects(nextPos,obstacles))player.y+=my;}player.anim.timer++;if(player.anim.timer>player.anim.speed){player.anim.timer=0;if(player.anim.isMoving)player.anim.frame=(player.anim.frame+1)%player.frameCount;else player.anim.frame=0;}}
     // Fait apparaître les ennemis
-    function spawnEnemies(){if(gameState.paused)return;enemySpawnTimer-=16;if(enemySpawnTimer<=0){const r=Math.max(200,2000-gameState.gameTime*2);enemySpawnTimer=r;const c=1+Math.floor(gameState.gameTime/10000);for(let i=0;i<c;i++){let x,y,sR,ok=false;for(let a=0;a<10;a++){const an=Math.random()*Math.PI*2;const d=Math.max(canvas.width/2,canvas.height/2)+50;x=player.x+Math.cos(an)*d;y=player.y+Math.sin(an)*d;const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];sR={x,y,w:t.w,h:t.h,hitboxOffsetX:t.hitboxOffsetX,hitboxOffsetY:t.hitboxOffsetY};if(!checkCollisionWithObjects(getHitbox(sR),obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){ok=true;break;}}if(ok){const tK=getEnemyTypeByTime();const t=enemyDefinitions[tK];enemies.push({x,y,...t,currentHealth:t.health,anim:{frame:0,timer:0,speed:t.animSpeed}});}}}}
+    function spawnEnemies(){
+        if(gameState.paused)return;
+        
+        // Ajustement du temps entre chaque vague d'ennemis (plus long au début)
+        const initialSpawnDelay = 2000; // ms
+        const minSpawnDelay = 300; // ms
+        const spawnDelayReductionRate = 0.05; // ms de réduction par ms de gameTime (1ms de réduction pour 20ms de temps de jeu)
+        const currentSpawnDelay = Math.max(minSpawnDelay, initialSpawnDelay - gameState.gameTime * spawnDelayReductionRate);
+        
+        enemySpawnTimer -= 16; // Diminue le timer de 16ms (environ le temps d'une frame)
+        if(enemySpawnTimer <= 0){
+            enemySpawnTimer = currentSpawnDelay; // Réinitialise le timer avec la nouvelle valeur de difficulté
+            
+            // Ajustement du nombre d'ennemis par vague (plus faible au début)
+            const initialEnemiesPerSpawn = 1;
+            const enemyIncreaseRate = 1 / 45000; // 1 ennemi supplémentaire toutes les 45 secondes
+            const maxEnemiesPerSpawn = 10; // Limite le nombre maximum d'ennemis par vague
+            const currentEnemiesToSpawn = Math.min(maxEnemiesPerSpawn, initialEnemiesPerSpawn + Math.floor(gameState.gameTime * enemyIncreaseRate));
+
+            for(let i=0;i<currentEnemiesToSpawn;i++){
+                let x,y,sR,ok=false;
+                for(let a=0;a<10;a++){ // Tente 10 fois de trouver une position valide
+                    const an=Math.random()*Math.PI*2;
+                    const d=Math.max(canvas.width/2,canvas.height/2)+50; // Distance du joueur
+                    x=player.x+Math.cos(an)*d;
+                    y=player.y+Math.sin(an)*d;
+                    
+                    // Utilise la nouvelle logique pour obtenir le type d'ennemi
+                    const tK=getEnemyTypeByTime();
+                    const t=enemyDefinitions[tK];
+                    
+                    sR={x,y,w:t.w,h:t.h,hitboxOffsetX:t.hitboxOffsetX,hitboxOffsetY:t.hitboxOffsetY};
+                    if(!checkCollisionWithObjects(getHitbox(sR),obstacles)&&x>0&&x<world.width&&y>0&&y<world.height){
+                        ok=true;
+                        break;
+                    }
+                }
+                if(ok){
+                    const tK=getEnemyTypeByTime();
+                    const t=enemyDefinitions[tK];
+                    // Initialise lastDamageTime pour chaque nouvel ennemi
+                    enemies.push({x,y,...t,currentHealth:t.health,anim:{frame:0,timer:0,speed:t.animSpeed}, lastDamageTime: 0});
+                }
+            }
+        }
+    }
     // Détermine le type d'ennemi à faire apparaître en fonction du temps de jeu
-    function getEnemyTypeByTime(){const rnd=Math.random();if(gameState.gameTime<30000)return'goblin';if(gameState.gameTime<90000)return rnd<0.6?'goblin':'skeleton';if(gameState.gameTime<180000)return rnd<0.4?'goblin':(rnd<0.8?'skeleton':'slime');return rnd<0.2?'goblin':(rnd<0.5?'skeleton':(rnd<0.8?'slime':'orc'));}
+    function getEnemyTypeByTime(){
+        const gameTimeSeconds = gameState.gameTime / 1000;
+        let availableEnemyTypes = ['goblin']; // Les goblins apparaissent toujours
+
+        if (gameTimeSeconds >= 5 * 60) { // Après 5 minutes (300 secondes)
+            availableEnemyTypes.push('skeleton');
+        }
+        if (gameTimeSeconds >= 10 * 60) { // Après 10 minutes (600 secondes)
+            availableEnemyTypes.push('slime');
+        }
+        if (gameTimeSeconds >= 15 * 60) { // Après 15 minutes (900 secondes)
+            availableEnemyTypes.push('orc');
+        }
+
+        // Sélectionne un type d'ennemi aléatoire parmi ceux disponibles
+        const randomIndex = Math.floor(Math.random() * availableEnemyTypes.length);
+        return availableEnemyTypes[randomIndex];
+    }
     // Met à jour la position et l'animation des ennemis
-    function updateEnemies(){enemies.forEach(e=>{const dx=player.x-e.x;const dy=player.y-e.y;const d=Math.sqrt(dx*dx+dy*dy);if(d>1){const mx=(dx/d)*e.speed;const my=(dy/d)*e.speed;const nextPos=getHitbox(e);nextPos.x+=mx;if(!checkCollisionWithObjects(nextPos,obstacles))e.x+=mx;nextPos.x-=mx;nextPos.y+=my;if(!checkCollisionWithObjects(nextPos,obstacles))e.y+=my;}if(checkCollision(getHitbox(player),getHitbox(e))){takeDamage(e.damage,e);}e.anim.timer++;if(e.anim.timer>e.anim.speed){e.anim.timer=0;e.anim.frame=(e.anim.frame+1)%e.frameCount;}});}
+    function updateEnemies(){
+        const now = Date.now();
+        enemies.forEach(e=>{
+            const dx=player.x-e.x;
+            const dy=player.y-e.y;
+            const d=Math.sqrt(dx*dx+dy*dy);
+            if(d>1){
+                const mx=(dx/d)*e.speed;
+                const my=(dy/d)*e.speed;
+                const nextPos=getHitbox(e);
+                nextPos.x+=mx;
+                if(!checkCollisionWithObjects(nextPos,obstacles))e.x+=mx;
+                nextPos.x-=mx;
+                nextPos.y+=my;
+                if(!checkCollisionWithObjects(nextPos,obstacles))e.y+=my;
+            }
+            // Vérifie la collision et le temps de rechargement des dégâts de l'ennemi
+            if(checkCollision(getHitbox(player),getHitbox(e))){
+                const damageCooldown = 1000; // 1 seconde de délai entre chaque dégât infligé par un ennemi
+                if (now - e.lastDamageTime > damageCooldown) {
+                    takeDamage(e.damage); // Appel de takeDamage sans l'argument 'enemy'
+                    e.lastDamageTime = now; // Met à jour le dernier temps d'infliction de dégâts pour cet ennemi
+                }
+            }
+            e.anim.timer++;
+            if(e.anim.timer>e.anim.speed){
+                e.anim.timer=0;
+                e.anim.frame=(e.anim.frame+1)%e.frameCount;
+            }
+        });
+    }
     // Gère la mort d'un ennemi
     function killEnemy(enemy){
     enemy.isDead=true;
@@ -379,11 +499,45 @@
     function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
     // Sélectionne une amélioration
     function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
-    let lastDamageTime=0;
+    
     // Gère les dégâts subis par le joueur
-    function takeDamage(amount,enemy){const now=Date.now();if(now-lastDamageTime>500){lastDamageTime=now;player.health-=amount;if(player.health<=0){player.health=0;gameOver();}}}
+    function takeDamage(amount){ 
+        const now = Date.now();
+        // Si le joueur est actuellement invincible, ne prend pas de dégâts
+        if (player.invincible && now < player.invincibilityEndTime) {
+            return;
+        }
+
+        player.health-=amount;
+        
+        // Active l'invincibilité après avoir subi des dégâts
+        player.invincible = true;
+        player.invincibilityEndTime = now + 1000; // Invincible pour 1 seconde (1000 ms)
+
+        if(player.health<=0){
+            player.health=0;
+            gameOver();
+        }
+    }
+
+    // Fonction pour mettre à jour l'état d'invincibilité du joueur
+    function updatePlayerInvincibility() {
+        const now = Date.now();
+        if (player.invincible && now >= player.invincibilityEndTime) {
+            player.invincible = false; // Désactive l'invincibilité si le temps est écoulé
+        }
+    }
+
     // Gère la fin du jeu
     function gameOver(){gameState.running=false;finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;gameOverModal.style.display='flex';}
+    
+    // Fonction de victoire
+    function gameVictory() {
+        gameState.running = false;
+        victoryModal.style.display = 'flex';
+        // Vous pouvez ajouter ici des informations spécifiques à la victoire, comme le temps final
+    }
+
     // Trouve l'ennemi le plus proche du joueur
     function findNearestEnemy(){let n=null,nD=Infinity;enemies.forEach(e=>{const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<nD){nD=d;n=e;}});return n;}
     // Met à jour l'interface utilisateur (UI)
@@ -522,7 +676,12 @@
             const frameWidth = sprite.naturalWidth / player.frameCount;
             const frameHeight = sprite.naturalHeight;
             const sourceX = player.anim.frame * frameWidth;
+            // Si le joueur est invincible, on le fait clignoter
+            if (player.invincible && Date.now() % 200 < 100) { // Clignote toutes les 100ms
+                ctx.globalAlpha = 0.5; // Rend le joueur semi-transparent
+            }
             ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.spriteH / 2, player.spriteW, player.spriteH);
+            ctx.globalAlpha = 1.0; // Réinitialise l'opacité
         }
         ctx.restore();
         
@@ -535,7 +694,7 @@
         }
 
         // Dessine l'aura de décomposition
-        const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();;}
         // Dessine les projectiles
         projectiles.forEach(p=>{ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);ctx.fill();});
         // Dessine les orbes d'aura
@@ -545,6 +704,19 @@
     }
 
     let lastTime = 0;
+    // Fonction pour mettre à jour la régénération du joueur
+    function updatePlayerRegeneration(deltaTime) {
+        if (player.regenerationRate > 0) {
+            // S'assurer que deltaTime est non-négatif.
+            const safeDeltaTime = Math.max(0, deltaTime);
+            // deltaTime est en millisecondes, regenerationRate est en PV par seconde
+            const healthToRegen = (player.regenerationRate * safeDeltaTime) / 1000;
+            
+            // La régénération ajoute de la vie. Math.min s'assure de ne pas dépasser la vie maximale.
+            player.health = Math.min(player.maxHealth, player.health + healthToRegen);
+        }
+    }
+
     // Boucle de jeu principale
     function gameLoop(timestamp){
         if(!gameState.running) {
@@ -560,7 +732,16 @@
             updateWeapons();
             updateProjectiles();
             updateXPGems();
+            updatePlayerRegeneration(deltaTime); // Appel de la fonction de régénération
+            updatePlayerInvincibility(); // Met à jour l'état d'invincibilité
             gameState.gameTime+=deltaTime;
+
+            // Vérifie la condition de victoire (30 minutes = 1800000 millisecondes)
+            const thirtyMinutesInMs = 30 * 60 * 1000;
+            if (gameState.gameTime >= thirtyMinutesInMs) {
+                gameVictory();
+                return; // Arrête le traitement de la logique de jeu après la victoire
+            }
         }
         draw();
         updateUI();
@@ -598,30 +779,53 @@
         pauseKillCountUI.textContent = `Kills: ${gameState.killCount}`;
 
         pauseUpgradesList.innerHTML = ''; // Nettoie la liste
-        const upgradeNames = {
-            magicMissile: "Missile Magique",
-            aura: "Orbes de Feu",
-            auraOfDecay: "Aura Néfaste"
-        };
 
+        // Stocke les améliorations choisies et leurs niveaux/valeurs actuelles
+        const currentUpgrades = {};
+
+        // Collecte les niveaux des armes
         for (const weaponId in player.weapons) {
-            const weapon = player.weapons[weaponId];
-            if (weapon.level > 0) {
-                const li = document.createElement('li');
-                li.textContent = `${upgradeNames[weaponId] || weaponId}: Niveau ${weapon.level}`;
-                pauseUpgradesList.appendChild(li);
+            if (player.weapons[weaponId].level > 0) {
+                currentUpgrades[weaponId] = player.weapons[weaponId].level;
             }
         }
-        // Pour les améliorations qui ne sont pas des armes, vérifiez manuellement ou ajoutez-les au fur et à mesure
-        // Exemple pour Max Health et Speed si elles sont pertinentes à afficher
-        if (player.maxHealth > 120) { // Si la vie max a été améliorée depuis le début
-            const li = document.createElement('li');
-            li.textContent = `Vie Max: ${player.maxHealth} (Niveau ${player.maxHealth/20 - 5})`; // Simplification pour le niveau
-            pauseUpgradesList.appendChild(li);
+
+        // Collecte les autres augmentations de statistiques
+        if (player.maxHealth > 120) {
+            currentUpgrades.maxHealth = (player.maxHealth - 120) / 20; // Nombre de fois amélioré
         }
-        if (player.speed > 4) { // Si la vitesse a été améliorée
+        if (player.speed > 4) {
+            currentUpgrades.speed = (player.speed - 4) / 0.5; // Nombre de fois amélioré
+        }
+        if (player.regenerationRate > 0) {
+            currentUpgrades.regeneration = player.regenerationRate / 0.5; // Nombre de fois amélioré
+        }
+
+        // Mappe les IDs des améliorations aux noms d'affichage et à la logique
+        const upgradeDisplayNames = {
+            magicMissile: "Missile Magique",
+            aura: "Orbes de Feu",
+            auraOfDecay: "Aura Néfaste",
+            maxHealth: "Coeur robuste",
+            speed: "Bottes de vitesse",
+            regeneration: "Régénération"
+        };
+
+        // Remplit la liste en fonction des améliorations collectées
+        for (const upgradeId in currentUpgrades) {
             const li = document.createElement('li');
-            li.textContent = `Vitesse: ${player.speed} (Niveau ${(player.speed-4)/0.5})`;
+            const level = currentUpgrades[upgradeId];
+            const displayName = upgradeDisplayNames[upgradeId] || upgradeId;
+
+            if (upgradeId === 'regeneration') {
+                li.textContent = `${displayName}: +${player.regenerationRate.toFixed(1)} PV/sec`;
+            } else if (upgradeId === 'maxHealth') {
+                li.textContent = `${displayName}: +${player.maxHealth - 120} Vie Max`;
+            } else if (upgradeId === 'speed') {
+                li.textContent = `${displayName}: +${(player.speed - 4).toFixed(1)} Vitesse`; // Utilisez toFixed pour la vitesse
+            } else {
+                li.textContent = `${displayName}: Niveau ${level}`;
+            }
             pauseUpgradesList.appendChild(li);
         }
     }
