@@ -186,6 +186,9 @@
             top: 20px;
             right: 20px;
             z-index: 30; /* Ensure it's above everything */
+            display: flex; /* Use flexbox to arrange buttons */
+            flex-direction: column; /* Stack buttons vertically */
+            gap: 10px; /* Space between buttons */
         }
         #sound-controls button {
             background-color: #f1c40f;
@@ -244,9 +247,16 @@
     Votre navigateur ne supporte pas l'élément audio.
 </audio>
 
+<!-- Audio element for magic missile sound -->
+<audio id="magic-missile-sound">
+    <source src="soundeffect/magicprojectilesound.mp3" type="audio/mpeg">
+    Votre navigateur ne supporte pas l'élément audio.
+</audio>
+
 <!-- Sound controls -->
 <div id="sound-controls">
     <button id="toggle-music-button">Musique: ON</button>
+    <button id="toggle-sfx-button">Effets Sonores: ON</button>
 </div>
 
 <script>
@@ -263,7 +273,13 @@
 
     // New: Audio elements
     const backgroundMusic = document.getElementById('background-music');
-    const toggleMusicButton = document.getElementById('toggle-music-button');
+    const magicMissileSound = document.getElementById('magic-missile-sound'); // Reference to the new audio element
+    let toggleMusicButton; // Will be assigned in init
+    let toggleSfxButton;   // Will be assigned in init
+
+    // Variable to track music state
+    let isMusicOn = true; // Assume music is on by default
+    let areSoundEffectsOn = true; // Assume sound effects are on by default
 
     // --- Asset Loading ---
     const assets = {};
@@ -279,6 +295,7 @@
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
         // magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Removed: not using sprite for magic missile
+        magicMissileSound: 'sounds/magic_missile.mp3' // Added magic missile sound
     };
 
     // Loads all images defined in assetSources
@@ -286,30 +303,39 @@
         let loadedCount = 0;
         const totalAssets = Object.keys(assetSources).length;
         for (const key in assetSources) {
-            assets[key] = new Image();
-            assets[key].src = assetSources[key];
-            assets[key].onload = () => {
+            // Check if the asset is an image or an audio file
+            if (key.includes('Sound')) {
+                // For audio, we don't need to create an Image object, just increment count
                 loadedCount++;
                 if (loadedCount === totalAssets) {
                     callback();
                 }
-            };
-            // Handles image loading errors by using a magenta square
-            assets[key].onerror = () => {
-              console.error(`Failed to load asset: ${key} at ${assetSources[key]}`);
-              const canvas = document.createElement('canvas');
-              const w = 64, h = 64;
-              canvas.width = w;
-              canvas.height = h;
-              const assetCtx = canvas.getContext('2d');
-              assetCtx.fillStyle = 'magenta';
-              assetCtx.fillRect(0, 0, w, h);
-              assets[key].src = canvas.toDataURL();
-              loadedCount++;
-              if (loadedCount === totalAssets) {
-                    callback();
-                }
-            };
+            } else {
+                assets[key] = new Image();
+                assets[key].src = assetSources[key];
+                assets[key].onload = () => {
+                    loadedCount++;
+                    if (loadedCount === totalAssets) {
+                        callback();
+                    }
+                };
+                // Handles image loading errors by using a magenta square
+                assets[key].onerror = () => {
+                    console.error(`Failed to load asset: ${key} at ${assetSources[key]}`);
+                    const canvas = document.createElement('canvas');
+                    const w = 64, h = 64;
+                    canvas.width = w;
+                    canvas.height = h;
+                    const assetCtx = canvas.getContext('2d');
+                    assetCtx.fillStyle = 'magenta';
+                    assetCtx.fillRect(0, 0, w, h);
+                    assets[key].src = canvas.toDataURL();
+                    loadedCount++;
+                    if (loadedCount === totalAssets) {
+                        callback();
+                    }
+                };
+            }
         }
     }
 
@@ -840,6 +866,14 @@
                 // Distance = range (canvas.width / 2) / projectile_speed_per_frame
                 // If speed is 8, and range is say 600px (for a 1200px canvas), then 600/8 = 75 frames.
 
+                // Play magic missile sound effect
+                if (areSoundEffectsOn) {
+                    magicMissileSound.currentTime = 0; // Rewind to start
+                    magicMissileSound.play().catch(error => {
+                        console.warn("Autoplay of magic missile sound was prevented:", error);
+                    });
+                }
+
                 // Use projectileDefinitions for magicMissile
                 const mmDef = projectileDefinitions.magicMissile;
                 projectiles.push({
@@ -1003,9 +1037,9 @@
         ctx.fillStyle = '#00FFFF'; // Magic Missile color (cyan for debugging)
         ctx.beginPath();
         // Triangle pointing right
-        ctx.moveTo(mmDef.drawW / 2, 0); // Tip of the triangle
-        ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2); // Bottom-left
-        ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2); // Bottom-right
+        ctx.moveTo(mmDef.drawW / 2, 0);
+        ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2);
+        ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -1188,9 +1222,9 @@
 
                 ctx.fillStyle = '#00FFFF'; // Magic Missile color (CYAN)
                 ctx.beginPath();
-                ctx.moveTo(p.w / 2, 0); // Tip of the triangle (pointing right)
-                ctx.lineTo(-p.w / 2, -p.h / 2); // Bottom-left
-                ctx.lineTo(-p.w / 2, p.h / 2); // Bottom-right
+                ctx.moveTo(p.w / 2, 0);
+                ctx.lineTo(-p.w / 2, -p.h / 2);
+                ctx.lineTo(-p.w / 2, p.h / 2);
                 ctx.closePath();
                 ctx.fill();
                 ctx.restore();
@@ -1292,13 +1326,15 @@
 
         console.log("Player state AT START of new game:", JSON.stringify({ speed: player.speed, magicMissileLevel: player.weapons.magicMissile.level }));
 
-        // Start background music when game starts
-        backgroundMusic.play().catch(error => {
-            console.warn("Autoplay was prevented. User must interact with the document first.", error);
-            // Show a message to the user that they need to click to enable sound
-            // Or handle it by toggling sound on first user interaction
-        });
-        toggleMusicButton.textContent = "Musique: ON"; // Update button text
+        // Only start background music if isMusicOn is true
+        if (isMusicOn) {
+            backgroundMusic.play().catch(error => {
+                console.warn("Autoplay was prevented. User must interact with the document first.", error);
+                // Show a message to the user that they need to click to enable sound
+                // Or handle it by toggling sound on first user interaction
+            });
+            toggleMusicButton.textContent = "Musique: ON"; // Update button text
+        }
 
 
         animationFrameId = requestAnimationFrame(gameLoop); // Starts game loop
@@ -1311,7 +1347,7 @@
         gameState.paused = true;
         pauseModal.style.display = 'flex';
         populatePauseStats(); // Updates stats in pause menu
-        // Removed: backgroundMusic.pause();
+        // Music is no longer paused here to keep it playing during pause.
     }
 
     // Function to resume the game
@@ -1321,7 +1357,7 @@
         pauseModal.style.display = 'none'; // FERME LE MENU PAUSE
         lastTime = performance.now(); // Resets time to avoid large deltaTime after pause
         console.log('resumeGame: lastTime reset for smooth resumption.');
-        // Removed: if (backgroundMusic.paused === false) { backgroundMusic.play().catch(error => { console.warn("Autoplay was prevented on resume. User must interact.", error); }); }
+        // Music is no longer resumed here, as it never stopped in pause.
     }
 
     // Function to quit the game and return to main menu
@@ -1359,10 +1395,8 @@
             animationFrameId = null;
             console.log(`quitGame: Animation frame ${animationFrameId} cancelled.`);
         }
-        // Stop music and rewind when quitting to main menu
-        backgroundMusic.pause();
-        backgroundMusic.currentTime = 0;
-        toggleMusicButton.textContent = "Musique: OFF"; // Set button text to OFF
+        // Music is no longer stopped or rewound here. It will keep playing as it's meant for the main menu.
+        // The `isMusicOn` state will remain, so if it was off, it stays off.
     }
 
     // Function to populate pause menu statistics
@@ -1460,41 +1494,66 @@
         }
     }
 
+    // Function to show a custom autoplay alert (moved outside init to be accessible)
+    function showCustomAutoplayAlert() {
+        const customAlert = document.createElement('div');
+        customAlert.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #2c2c2c;
+            padding: 20px;
+            border: 4px solid #f1c40f;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 9999;
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        `;
+        customAlert.innerHTML = `
+            <p>Cliquez n'importe où sur l'écran pour activer le son.</p>
+            <button style="background-color: #f1c40f; color: #1a1a1a; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer; font-family: 'Press Start 2P', cursive;">OK</button>
+        `;
+        document.body.appendChild(customAlert);
+        customAlert.querySelector('button').onclick = () => {
+            document.body.removeChild(customAlert);
+            // After user interaction, try playing music again if it was intended to be on
+            if (isMusicOn && backgroundMusic.paused) {
+                backgroundMusic.play().catch(err => console.warn("Failed to play music after user interaction:", err));
+            }
+        };
+    }
+
     // Function to toggle background music
     function toggleMusic() {
         if (backgroundMusic.paused) {
             backgroundMusic.play().catch(error => {
-                console.warn("Autoplay was prevented. User must interact with the document first.", error);
-                // Utiliser une boîte de message personnalisée au lieu de alert()
-                const customAlert = document.createElement('div');
-                customAlert.style.cssText = `
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    background-color: #2c2c2c;
-                    padding: 20px;
-                    border: 4px solid #f1c40f;
-                    border-radius: 10px;
-                    text-align: center;
-                    z-index: 9999;
-                    font-family: 'Press Start 2P', cursive;
-                    color: #fff;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.5);
-                `;
-                customAlert.innerHTML = `
-                    <p>Cliquez n'importe où sur l'écran pour activer le son.</p>
-                    <button style="background-color: #f1c40f; color: #1a1a1a; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer; font-family: 'Press Start 2P', cursive;">OK</button>
-                `;
-                document.body.appendChild(customAlert);
-                customAlert.querySelector('button').onclick = () => {
-                    document.body.removeChild(customAlert);
-                };
+                console.warn("Autoplay of background music was prevented. User interaction required.", error);
+                showCustomAutoplayAlert(); // Show the generic alert
+                toggleMusicButton.textContent = "Musique: OFF"; // Reflect current state
+                isMusicOn = false; // Set music state to off if autoplay failed
             });
             toggleMusicButton.textContent = "Musique: ON";
+            isMusicOn = true; // Update music state
         } else {
             backgroundMusic.pause();
             toggleMusicButton.textContent = "Musique: OFF";
+            isMusicOn = false; // Update music state
+        }
+    }
+
+    // New function to toggle sound effects
+    function toggleSoundEffects() {
+        areSoundEffectsOn = !areSoundEffectsOn; // Toggle the state
+        if (areSoundEffectsOn) {
+            toggleSfxButton.textContent = "Effets Sonores: ON";
+        } else {
+            toggleSfxButton.textContent = "Effets Sonores: OFF";
+            // If any sound effect is currently playing, stop it.
+            magicMissileSound.pause();
+            magicMissileSound.currentTime = 0; // Rewind for next play
         }
     }
 
@@ -1545,6 +1604,14 @@
         pauseKillCountUI = document.getElementById('pause-kill-count');
         pauseUpgradesList = document.getElementById('pause-upgrades-list');
 
+        // Get references to toggle buttons
+        toggleMusicButton = document.getElementById('toggle-music-button');
+        toggleSfxButton = document.getElementById('toggle-sfx-button');
+
+        // Set initial button texts
+        toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+        toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+
         // Resizes canvas and creates obstacles
         resizeCanvas();
         // Add event listener for window resize to adjust canvas size
@@ -1573,12 +1640,15 @@
         });
         // Add event listener for the toggle music button
         toggleMusicButton.addEventListener('click', toggleMusic);
+        // Add event listener for the toggle sound effects button
+        toggleSfxButton.addEventListener('click', toggleSoundEffects);
 
         // Try to autoplay music on page load, if allowed by browser
         backgroundMusic.play().catch(error => {
             console.log("Autoplay of background music was prevented. User interaction required.");
+            showCustomAutoplayAlert();
             toggleMusicButton.textContent = "Musique: OFF"; // Reflect current state
-            // It's a good practice to indicate to the user why music might not be playing
+            isMusicOn = false; // Set music state to off if autoplay failed
         });
     });
 </script>
