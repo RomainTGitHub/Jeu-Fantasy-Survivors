@@ -88,8 +88,9 @@
         /* Style for gold display */
         #gold-display {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
+            top: 100px;
+            bottom: 5px;
+            right: 5px;
             font-size: 16px;
             color: #f1c40f;
             text-shadow: 2px 2px 2px #000;
@@ -258,9 +259,10 @@
         slime: 'images/slime_spritesheet.png',
         orc: 'images/orc_spritesheet.png',
         xpGem: 'images/xpGem_spritesheet.png',
-        background: 'images/background.jpg',
+        background: 'images/background.png',
         obstacle: 'images/obstacles.png',
-        gold: 'images/gold_spritesheet.png' // New gold spritesheet
+        gold: 'images/gold_spritesheet.png', // New gold spritesheet
+        magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Placeholder for Magic Missile sprite
     };
 
     // Loads all images defined in assetSources
@@ -341,6 +343,21 @@
         xpGem: { frameCount: 7, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 },
         gold: { frameCount: 6, animSpeed: 10, visualOffsetX: 0, visualOffsetY: 0 } // Gold coin definition
     };
+    // Projectile definitions (new for animated projectiles)
+    const projectileDefinitions = {
+        magicMissile: {
+            spriteAsset: 'magicMissileSprite', // Key in assets object
+            spriteW: 16, // Width of a single frame in the spritesheet
+            spriteH: 16, // Height of a single frame in the spritesheet
+            drawW: 32, // Desired drawing width on canvas
+            drawH: 32, // Desired drawing height on canvas
+            frameCount: 4, // Number of frames in the spritesheet
+            animSpeed: 5, // Animation speed (lower is faster)
+            visualOffsetX: -16, // Adjust visual offset for drawing to center (drawW / 2)
+            visualOffsetY: -16, // Adjust visual offset for drawing to center (drawH / 2)
+        }
+    };
+
     player.frameCount = 4; // Number of frames for player animation
     // Available upgrades when leveling up
     const availableUpgrades=[
@@ -756,13 +773,64 @@
                 // Projectile speed is 8px per frame (assuming 60fps, but calculating based on distance).
                 // Distance = range (canvas.width / 2) / projectile_speed_per_frame
                 // If speed is 8, and range is say 600px (for a 1200px canvas), then 600/8 = 75 frames.
-                projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan: Math.ceil((canvas.width / 2) / 8),angle:angle});
+                
+                // Use projectileDefinitions for magicMissile
+                const mmDef = projectileDefinitions.magicMissile;
+                projectiles.push({
+                    x:player.x+player.w/2,
+                    y:player.y+player.h/2,
+                    w:mmDef.drawW, // Use drawW for hitbox
+                    h:mmDef.drawH, // Use drawH for hitbox
+                    vx:Math.cos(angle)*8,
+                    vy:Math.sin(angle)*8,
+                    damage:mm.damage,
+                    lifespan: Math.ceil((canvas.width / 2) / 8),
+                    angle:angle,
+                    type: 'magicMissile', // Type of projectile to draw correctly
+                    anim: { frame: 0, timer: 0, speed: mmDef.animSpeed },
+                    frameCount: mmDef.frameCount,
+                    spriteAsset: mmDef.spriteAsset,
+                    spriteW: mmDef.spriteW,
+                    spriteH: mmDef.spriteH,
+                    visualOffsetX: mmDef.visualOffsetX,
+                    visualOffsetY: mmDef.visualOffsetY
+                });
             }
         }
         const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
         const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
     // Updates projectiles
-    function updateProjectiles(){for(let pI=projectiles.length-1;pI>=0;pI--){const p=projectiles[pI];p.x+=p.vx;p.y+=p.vy;p.lifespan--;if(p.lifespan<=0){projectiles.splice(pI,1);continue;}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(checkCollision(p,getHitbox(e))){e.currentHealth-=p.damage;if(e.currentHealth<=0&&!e.isDead){killEnemy(e);}projectiles.splice(pI,1);break;}}}}
+    function updateProjectiles(){
+        for(let pI=projectiles.length-1;pI>=0;pI--){
+            const p=projectiles[pI];
+            p.x+=p.vx;
+            p.y+=p.vy;
+            p.lifespan--;
+
+            // Update animation frame for projectiles
+            p.anim.timer++;
+            if (p.anim.timer > p.anim.speed) {
+                p.anim.timer = 0;
+                p.anim.frame = (p.anim.frame + 1) % p.frameCount;
+            }
+
+            if(p.lifespan<=0){
+                projectiles.splice(pI,1);
+                continue;
+            }
+            for(let i=enemies.length-1;i>=0;i--){
+                const e=enemies[i];
+                if(checkCollision(p,getHitbox(e))){
+                    e.currentHealth-=p.damage;
+                    if(e.currentHealth<=0&&!e.isDead){
+                        killEnemy(e);
+                    }
+                    projectiles.splice(pI,1);
+                    break;
+                }
+            }
+        }
+    }
 
     // Draws debug gallery for sprites
     function drawDebugGallery() {
@@ -816,7 +884,29 @@
                 y += spacing;
             }
         }
+        // Draw Projectile (Magic Missile) in debug gallery
+        ctx.fillText("Magic Missile", x, y - 10);
+        const mmDef = projectileDefinitions.magicMissile;
+        if (assets[mmDef.spriteAsset] && assets[mmDef.spriteAsset].complete) {
+            const sprite = assets[mmDef.spriteAsset];
+            const frameWidth = sprite.naturalWidth / mmDef.frameCount; // Correct frame width based on spritesheet
+            const frameHeight = sprite.naturalHeight; // Correct frame height based on spritesheet
+            // Apply visualOffsetX and visualOffsetY here for centering within the debug gallery cell
+            ctx.drawImage(sprite, 0, 0, frameWidth, frameHeight, x + mmDef.visualOffsetX, y + mmDef.visualOffsetY, mmDef.drawW, mmDef.drawH);
+            if (debugMode) {
+                ctx.strokeStyle = 'rgba(255,0,0,0.8)';
+                ctx.lineWidth = 2;
+                // The hitbox should match drawW and drawH, centered around the visual offsets
+                ctx.strokeRect(x, y, mmDef.drawW, mmDef.drawH); // Hitbox for projectile
+            }
+        }
+        x += spacing;
+        if (x + spacing > canvas.width) {
+            x = 50;
+            y += spacing;
+        }
     }
+
     // Main drawing function
     function draw(){
         // Only draw debug gallery if debugGalleryMode is true
@@ -933,7 +1023,41 @@
         // Draws decay aura
         const aod=player.weapons.auraOfDecay;if(aod.level>0){ctx.beginPath();ctx.fillStyle='rgba(142,68,173,0.15)';const pulse=aod.radius+(Math.sin(Date.now()/200)*5);ctx.arc(player.x+player.w/2,player.y+player.h/2,pulse,0,Math.PI*2);ctx.fill();;}
         // Draws projectiles
-        projectiles.forEach(p=>{ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);ctx.fill();});
+        projectiles.forEach(p=>{
+            // Check if projectile has a sprite asset defined
+            if (p.type === 'magicMissile' && assets[p.spriteAsset] && assets[p.spriteAsset].complete && assets[p.spriteAsset].naturalHeight !== 0) {
+                const sprite = assets[p.spriteAsset];
+                const frameWidth = sprite.naturalWidth / p.frameCount; // Correct frame width based on spritesheet
+                const frameHeight = sprite.naturalHeight; // Correct frame height based on spritesheet
+                const sourceX = p.anim.frame * frameWidth;
+
+                ctx.save();
+                // Translate to the center of the projectile for rotation
+                ctx.translate(p.x + p.w / 2, p.y + p.h / 2); 
+                ctx.rotate(p.angle); // Rotate based on projectile angle
+
+                // Draw the sprite, applying visual offsets to draw it centered around the new origin (0,0)
+                ctx.drawImage(sprite, 
+                              sourceX, 0, frameWidth, frameHeight, 
+                              p.visualOffsetX, p.visualOffsetY, // Drawing at visual offsets
+                              p.drawW, p.drawH);
+                
+                ctx.restore();
+
+                if(debugMode) { // Draw hitbox in debug mode (unrotated)
+                    ctx.strokeStyle = 'rgba(255,255,0,0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                }
+            } else {
+                // Fallback to old drawing if no sprite or not loaded
+                ctx.fillStyle='#9b59b6';
+                ctx.beginPath();
+                ctx.arc(p.x,p.y,p.w/2,0,Math.PI*2);
+                ctx.fill();
+            }
+        });
+
         // Draws aura orbs
         const aura=player.weapons.aura;if(aura.level>0){const orbW=24,orbH=24;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
         
