@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D&D Survivors</title>
+    <title>Fantasy Survivors</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -27,6 +27,13 @@
             background-color: #000;
             width: clamp(320px, 90vw, 1400px);
             height: clamp(240px, 85vh, 900px);
+            overflow: hidden; /* Ensure content doesn't spill out */
+            transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out; /* Smooth transition for damage feedback */
+        }
+        /* New CSS for damage feedback */
+        #game-container.damage-overlay {
+            border-color: #ff0000; /* Red border on damage */
+            box-shadow: 0 0 25px 10px rgba(255,0,0,0.7); /* Red glow effect */
         }
         canvas {
             display: block;
@@ -212,7 +219,7 @@
     <div id="ui-container"></div>
     <!-- Main Menu -->
     <div id="main-menu">
-        <h1>D&D Survivors</h1>
+        <h1>Fantasy Survivors</h1>
         <p>APPUYEZ SUR N'IMPORTE QUELLE TOUCHE POUR COMMENCER</p>
     </div>
     <!-- Pause Menu -->
@@ -683,6 +690,14 @@
         player.invincible = true;
         player.invincibilityEndTime = now + 1000; // Invincible for 1 second (1000 ms)
 
+        // Add damage overlay class to game container
+        gameContainer.classList.add('damage-overlay');
+        // Remove the class after a short delay to create a flash effect
+        setTimeout(() => {
+            gameContainer.classList.remove('damage-overlay');
+        }, 200); // Flash for 200 milliseconds
+
+
         if(player.health<=0){
             player.health=0;
             gameOver();
@@ -792,7 +807,7 @@
             }
         }
         const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}
+        const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!e.isDead){killEnemy(e);}}});}}
     // Updates projectiles
     function updateProjectiles(){
         for(let pI=projectiles.length-1;pI>=0;pI--){
@@ -884,8 +899,8 @@
         ctx.fillText("Magic Missile", x, y - 10);
         const mmDef = projectileDefinitions.magicMissile;
 
-        // Draw trail elements in debug gallery
-        const sampleProjectile = { // Create a dummy projectile for trail visualization
+        // Create a dummy projectile for trail visualization
+        const sampleProjectile = { 
             x: x + mmDef.drawW / 2, y: y + mmDef.drawH / 2,
             w: mmDef.drawW, h: mmDef.drawH,
             angle: 0, // Assume 0 angle for gallery
