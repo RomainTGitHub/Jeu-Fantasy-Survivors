@@ -100,7 +100,7 @@
             right: 5px;
             font-size: 16px;
             color: #f1c40f;
-            text-shadow: 2px 2px 2px #000;
+            text-shadow: 2px 2px #000;
             pointer-events: none;
             z-index: 5;
         }
@@ -174,6 +174,12 @@
             margin-top: 15px; /* Smaller margin between buttons */
             margin-bottom: 5px; /* Add some space below each button */
         }
+        #main-menu-gold { /* Style for gold display on main menu */
+            font-size: 20px;
+            color: #f1c40f;
+            text-shadow: 2px 2px 2px #000;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -185,6 +191,7 @@
         <h1>Fantasy Survivors</h1>
         <button id="startGameButton">Jouer !</button>
         <button id="upgradesMenuButton">Améliorations</button>
+        <p id="main-menu-gold">Or: 0</p> <!-- Gold display on main menu -->
     </div>
     <!-- Pause Menu -->
     <div id="pause-modal" class="modal">
@@ -212,6 +219,8 @@
     </div>
 </div>
 <script>
+    // No Firebase imports needed for localStorage persistence
+    // Global variables for game state and UI elements
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const gameContainer = document.getElementById('game-container');
@@ -219,6 +228,7 @@
     const mainMenu = document.getElementById('main-menu'); // Reference to the main menu
     const pauseModal = document.getElementById('pause-modal'); // Reference to the pause menu
     const victoryModal = document.getElementById('victory-modal'); // Reference to the victory modal
+    let mainMenuGoldUI; // Reference to the gold display on main menu
 
     // --- Asset Loading ---
     const assets = {};
@@ -674,13 +684,19 @@
     }
 
     // Handles game over
-    function gameOver(){gameState.running=false;finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;gameOverModal.style.display='flex';}
+    async function gameOver(){
+        gameState.running=false;
+        finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;
+        gameOverModal.style.display='flex';
+        savePlayerGold(); // Save gold on game over
+    }
     
     // Victory function
-    function gameVictory() {
+    async function gameVictory() {
         gameState.running = false;
         victoryModal.style.display = 'flex';
         // You can add victory-specific information here, like final time
+        savePlayerGold(); // Save gold on victory
     }
 
     // Function to check if an enemy is visible on screen
@@ -1070,7 +1086,7 @@
 
             // Ajoute des arrêts de couleur
             gradient.addColorStop(0, 'rgba(80, 0, 80, 0.6)'); // Mauve plus foncé au centre
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');  // Noir transparent au bord
+            gradient.addColorStop(1,'rgba(0, 0, 0, 0.0)');  // Noir transparent au bord
 
             ctx.fillStyle = gradient;
             ctx.arc(centerX, centerY, pulse, 0, Math.PI * 2);
@@ -1183,6 +1199,7 @@
     // Function to start the game
     function startGame() {
         mainMenu.style.display = 'none'; // Hides main menu
+        mainMenuGoldUI.style.display = 'none'; // Explicitly hide gold in main menu
         gameState.gameStarted = true;
         gameState.running = true;
         gameState.paused = false;
@@ -1264,6 +1281,40 @@
         }
     }
 
+    // Function to load player's gold from localStorage
+    function loadPlayerGold() {
+        try {
+            const storedGold = localStorage.getItem('playerGold');
+            if (storedGold !== null) {
+                player.gold = parseInt(storedGold, 10);
+                console.log("Or chargé depuis localStorage :", player.gold);
+            } else {
+                player.gold = 0;
+                console.log("Aucune donnée d'or trouvée dans localStorage, l'or est initialisé à 0.");
+            }
+            updateMainMenuGoldDisplay(); // Update main menu display after loading
+        } catch (error) {
+            console.error("Erreur lors du chargement de l'or du joueur depuis localStorage :", error);
+            player.gold = 0; // Fallback in case of localStorage issues
+        }
+    }
+
+    // Function to save player's gold to localStorage
+    function savePlayerGold() {
+        try {
+            localStorage.setItem('playerGold', player.gold.toString());
+            console.log("Or sauvegardé dans localStorage :", player.gold);
+        } catch (error) {
+            console.error("Erreur lors de la sauvegarde de l'or du joueur dans localStorage :", error);
+        }
+    }
+
+    // Function to update gold display on main menu
+    function updateMainMenuGoldDisplay() {
+        if (mainMenuGoldUI) {
+            mainMenuGoldUI.textContent = `Or: ${player.gold}`;
+        }
+    }
 
     // Game initialization function
     function init(){
@@ -1301,7 +1352,8 @@
         upgradeOptionsContainer=document.getElementById('upgrade-options');
         gameOverModal=document.getElementById('game-over-modal');
         finalScoreUI=document.getElementById('final-score');
-        
+        mainMenuGoldUI = document.getElementById('main-menu-gold'); // Get reference for main menu gold
+
         // References to pause menu elements
         pauseLevelUI = document.getElementById('pause-level');
         pauseTimerUI = document.getElementById('pause-timer');
@@ -1317,8 +1369,8 @@
         // Loads assets and starts game loop once everything is loaded
         loadAssets(() => {
             backgroundPattern = ctx.createPattern(assets.background, 'repeat');
-            // We no longer call gameLoop here directly, but in startGame()
-            // However, we must call draw() once to display the main menu
+            // Call loadPlayerGold after assets are loaded and UI elements are available
+            loadPlayerGold(); 
             draw(); 
         });
     }
