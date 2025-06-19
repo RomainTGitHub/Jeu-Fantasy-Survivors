@@ -136,7 +136,7 @@
             border-radius: 5px;
         }
         .upgrade-option:hover { background-color: #f1c40f; color: #1a1a1a; }
-        #game-over-modal button, #main-menu button, #pause-modal button, #victory-modal button { /* Ajout des boutons de modal */
+        #game-over-modal button, #main-menu button, #pause-modal button, #victory-modal button, #options-modal button { /* Ajout des boutons de modal */
             font-family: 'Press Start 2P', cursive;
             font-size: 16px;
             padding: 15px 30px;
@@ -200,6 +200,50 @@
             cursor: pointer;
             border-radius: 5px;
         }
+
+        /* Styles for volume sliders in options modal */
+        .volume-control {
+            margin: 15px 0;
+            text-align: left;
+            width: 100%;
+        }
+        .volume-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #fff;
+        }
+        .volume-control input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none; /* Override default CSS styles */
+            appearance: none;
+            height: 10px;
+            background: #d3d3d3; /* Grey background */
+            outline: none; /* Remove outline */
+            opacity: 0.7; /* Set transparency (for the slider track) */
+            -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+            transition: opacity .2s;
+            border-radius: 5px;
+        }
+        /* Slider thumb */
+        .volume-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #f1c40f; /* Yellow color */
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a1a1a;
+        }
+        .volume-control input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #f1c40f;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a1a1a;
+        }
     </style>
 </head>
 <body>
@@ -211,6 +255,7 @@
         <h1>Fantasy Survivors</h1>
         <button id="startGameButton">Jouer !</button>
         <button id="upgradesMenuButton">Améliorations</button>
+        <button id="optionsMenuButton">Options</button> <!-- New Options button -->
         <p id="main-menu-gold">Or: 0</p> <!-- Gold display on main menu -->
     </div>
     <!-- Pause Menu -->
@@ -227,8 +272,23 @@
                 <ul id="pause-upgrades-list"></ul>
             </div>
             <button onclick="resumeGame()">Reprendre</button>
-            <!-- Nouveau bouton pour quitter la partie -->
+            <button onclick="showOptionsFromPause()">Options</button> <!-- Options button in Pause menu -->
             <button onclick="quitGame()">Quitter la partie</button>
+        </div>
+    </div>
+    <!-- Options Menu -->
+    <div id="options-modal" class="modal">
+        <div class="modal-content">
+            <h2>OPTIONS</h2>
+            <div class="volume-control">
+                <label for="music-volume-slider">Volume Musique:</label>
+                <input type="range" id="music-volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+            <div class="volume-control">
+                <label for="sfx-volume-slider">Volume Effets Sonores:</label>
+                <input type="range" id="sfx-volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+            <button id="optionsBackButton">Retour</button>
         </div>
     </div>
     <!-- Victory Screen -->
@@ -246,12 +306,6 @@
     <source src="music/mainmenumusic.mp3" type="audio/mpeg">
     Votre navigateur ne supporte pas l'élément audio.
 </audio>
-
-<!-- Removed: Audio element for magic missile sound, now created dynamically -->
-<!-- <audio id="magic-missile-sound">
-    <source src="sounds/magic_missile.mp3" type="audio/mpeg">
-    Your browser does not support the audio element.
-</audio> -->
 
 <!-- Sound controls -->
 <div id="sound-controls">
@@ -277,9 +331,19 @@
     let toggleMusicButton; // Will be assigned in init
     let toggleSfxButton;   // Will be assigned in init
 
-    // Variable to track music state
+    // Options menu elements
+    let optionsModal;
+    let musicVolumeSlider;
+    let sfxVolumeSlider;
+    let optionsBackButton;
+    let returnToMenuAfterOptions = ''; // To track which menu to return to ('main' or 'pause')
+
+    // Variable to track music state and volume
     let isMusicOn = true; // Assume music is on by default
+    let musicVolume = 1; // Default music volume (1 = 100%)
     let areSoundEffectsOn = true; // Assume sound effects are on by default
+    let sfxVolume = 1; // Default SFX volume (1 = 100%)
+
 
     // --- Asset Loading ---
     const assets = {};
@@ -294,7 +358,6 @@
         background: 'images/background.png',
         obstacle: 'images/obstacles.png',
         gold: 'images/gold_spritesheet.png', // New gold spritesheet
-        // magicMissileSprite: 'images/magicprojectile_spritesheet.png' // Removed: not using sprite for magic missile
         magicMissileSound: 'soundeffect/magicprojectile.mp3' // Added magic missile sound path
     };
 
@@ -870,6 +933,7 @@
                 if (areSoundEffectsOn) {
                     // Create a new Audio object each time a sound effect is played
                     const newMagicMissileSound = new Audio(assetSources.magicMissileSound);
+                    newMagicMissileSound.volume = sfxVolume; // Set volume from slider
                     newMagicMissileSound.play().catch(error => {
                         console.warn("Autoplay of magic missile sound was prevented:", error);
                     });
@@ -1025,8 +1089,8 @@
             ctx.fillStyle = '#00FFFF'; // Same color as the main missile
             ctx.beginPath();
             ctx.moveTo(mmDef.drawW / 2, 0);
-            ctx.lineTo(-mm.drawW / 2, -mm.drawH / 2);
-            ctx.lineTo(-mm.drawW / 2, mm.drawH / 2);
+            ctx.lineTo(-mmDef.drawW / 2, -mmDef.drawH / 2);
+            ctx.lineTo(-mmDef.drawW / 2, mmDef.drawH / 2);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
@@ -1472,19 +1536,52 @@
                 console.log("Aucune donnée d'or trouvée dans localStorage, l'or est initialisé à 0.");
             }
             updateMainMenuGoldDisplay(); // Update main menu display after loading
+
+            // Load volume settings
+            const savedMusicVolume = localStorage.getItem('musicVolume');
+            const savedSfxVolume = localStorage.getItem('sfxVolume');
+            const savedIsMusicOn = localStorage.getItem('isMusicOn');
+            const savedAreSfxOn = localStorage.getItem('areSoundEffectsOn');
+
+            if (savedMusicVolume !== null) {
+                musicVolume = parseFloat(savedMusicVolume);
+                backgroundMusic.volume = musicVolume;
+            }
+            if (savedSfxVolume !== null) {
+                sfxVolume = parseFloat(savedSfxVolume);
+            }
+            if (savedIsMusicOn !== null) {
+                isMusicOn = savedIsMusicOn === 'true';
+                backgroundMusic.volume = isMusicOn ? musicVolume : 0;
+            }
+            if (savedAreSfxOn !== null) {
+                areSoundEffectsOn = savedAreSfxOn === 'true';
+            }
+
+            // Update sliders and buttons
+            if (musicVolumeSlider) musicVolumeSlider.value = musicVolume;
+            if (sfxVolumeSlider) sfxVolumeSlider.value = sfxVolume;
+            if (toggleMusicButton) toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+            if (toggleSfxButton) toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+
+
         } catch (error) {
-            console.error("Erreur lors du chargement de l'or du joueur depuis localStorage :", error);
+            console.error("Erreur lors du chargement de l'or du joueur et des paramètres audio depuis localStorage :", error);
             player.gold = 0; // Fallback in case of localStorage issues
         }
     }
 
-    // Function to save player's gold to localStorage
+    // Function to save player's gold and audio settings to localStorage
     function savePlayerGold() {
         try {
             localStorage.setItem('playerGold', player.gold.toString());
-            console.log("Or sauvegardé dans localStorage :", player.gold);
+            localStorage.setItem('musicVolume', musicVolume.toString());
+            localStorage.setItem('sfxVolume', sfxVolume.toString());
+            localStorage.setItem('isMusicOn', isMusicOn.toString());
+            localStorage.setItem('areSoundEffectsOn', areSoundEffectsOn.toString());
+            console.log("Or et paramètres audio sauvegardés dans localStorage.");
         } catch (error) {
-            console.error("Erreur lors de la sauvegarde de l'or du joueur dans localStorage :", error);
+            console.error("Erreur lors de la sauvegarde de l'or du joueur et des paramètres audio dans localStorage :", error);
         }
     }
 
@@ -1529,33 +1626,77 @@
 
     // Function to toggle background music
     function toggleMusic() {
-        if (backgroundMusic.paused) {
+        if (isMusicOn) {
+            backgroundMusic.volume = 0;
+            toggleMusicButton.textContent = "Musique: OFF";
+            isMusicOn = false;
+        } else {
+            backgroundMusic.volume = musicVolume; // Restore saved volume
             backgroundMusic.play().catch(error => {
                 console.warn("Autoplay of background music was prevented. User interaction required.", error);
-                showCustomAutoplayAlert(); // Show the generic alert
-                toggleMusicButton.textContent = "Musique: OFF"; // Reflect current state
-                isMusicOn = false; // Set music state to off if autoplay failed
+                showCustomAutoplayAlert();
             });
             toggleMusicButton.textContent = "Musique: ON";
-            isMusicOn = true; // Update music state
-        } else {
-            backgroundMusic.pause();
-            toggleMusicButton.textContent = "Musique: OFF";
-            isMusicOn = false; // Update music state
+            isMusicOn = true;
         }
+        savePlayerGold(); // Save state
     }
 
-    // New function to toggle sound effects
+    // Function to toggle sound effects
     function toggleSoundEffects() {
         areSoundEffectsOn = !areSoundEffectsOn; // Toggle the state
         if (areSoundEffectsOn) {
             toggleSfxButton.textContent = "Effets Sonores: ON";
         } else {
             toggleSfxButton.textContent = "Effets Sonores: OFF";
-            // If any sound effect is currently playing, stop it.
-            // Note: Since we're creating new Audio instances, there's no single magicMissileSound to stop here.
-            // If you had many looping SFX, you might manage them in an array to stop them all.
         }
+        savePlayerGold(); // Save state
+    }
+
+    // Functions to show/hide options modal
+    function showOptions(fromMenu) {
+        returnToMenuAfterOptions = fromMenu;
+        optionsModal.style.display = 'flex';
+        // Hide other menus
+        mainMenu.style.display = 'none';
+        pauseModal.style.display = 'none';
+        // Set slider values to current volumes
+        musicVolumeSlider.value = backgroundMusic.volume;
+        sfxVolumeSlider.value = sfxVolume;
+    }
+
+    function showOptionsFromMain() {
+        showOptions('main');
+    }
+
+    function showOptionsFromPause() {
+        showOptions('pause');
+    }
+
+    function hideOptions() {
+        optionsModal.style.display = 'none';
+        if (returnToMenuAfterOptions === 'main') {
+            mainMenu.style.display = 'flex';
+        } else if (returnToMenuAfterOptions === 'pause') {
+            pauseModal.style.display = 'flex';
+        }
+        savePlayerGold(); // Save volume settings when closing options
+    }
+
+    // Functions to update volume from sliders
+    function updateMusicVolume() {
+        musicVolume = parseFloat(musicVolumeSlider.value);
+        backgroundMusic.volume = musicVolume;
+        isMusicOn = musicVolume > 0; // Update isMusicOn based on slider
+        toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+        savePlayerGold(); // Save volume immediately
+    }
+
+    function updateSfxVolume() {
+        sfxVolume = parseFloat(sfxVolumeSlider.value);
+        areSoundEffectsOn = sfxVolume > 0; // Update areSoundEffectsOn based on slider
+        toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+        savePlayerGold(); // Save volume immediately
     }
 
     // Game initialization function
@@ -1609,9 +1750,16 @@
         toggleMusicButton = document.getElementById('toggle-music-button');
         toggleSfxButton = document.getElementById('toggle-sfx-button');
 
+        // Get references to options modal elements
+        optionsModal = document.getElementById('options-modal');
+        musicVolumeSlider = document.getElementById('music-volume-slider');
+        sfxVolumeSlider = document.getElementById('sfx-volume-slider');
+        optionsBackButton = document.getElementById('optionsBackButton');
+
         // Set initial button texts
-        toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
-        toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+        // These will be updated by loadPlayerGold after init is complete
+        // toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+        // toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
 
         // Resizes canvas and creates obstacles
         resizeCanvas();
@@ -1623,7 +1771,7 @@
         loadAssets(() => {
             backgroundPattern = ctx.createPattern(assets.background, 'repeat');
             // Call loadPlayerGold after assets are loaded and UI elements are available
-            loadPlayerGold();
+            loadPlayerGold(); // This will also set initial volumes and button texts
             draw();
         });
     }
@@ -1639,6 +1787,13 @@
             // Future functionality for upgrades menu goes here
             // For now, it just logs to the console.
         });
+        document.getElementById('optionsMenuButton').addEventListener('click', showOptionsFromMain); // New button for main menu
+        document.getElementById('optionsBackButton').addEventListener('click', hideOptions); // Back button in options
+
+        // Add event listener for volume sliders
+        musicVolumeSlider.addEventListener('input', updateMusicVolume);
+        sfxVolumeSlider.addEventListener('input', updateSfxVolume);
+
         // Add event listener for the toggle music button
         toggleMusicButton.addEventListener('click', toggleMusic);
         // Add event listener for the toggle sound effects button
