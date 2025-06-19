@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy Survivors</title>
+    <title>D&D Survivors</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -94,7 +94,7 @@
             border-radius: 5px;
         }
         .upgrade-option:hover { background-color: #f1c40f; color: #1a1a1a; }
-        #game-over-modal button, #main-menu button {
+        #game-over-modal button, #main-menu button, #pause-modal button { /* Ajout du bouton pause */
             font-family: 'Press Start 2P', cursive;
             font-size: 16px;
             padding: 15px 30px;
@@ -137,16 +137,64 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(1.05); opacity: 0.8; }
         }
+
+        /* Styles spécifiques au menu pause */
+        #pause-stats p {
+            font-size: 18px;
+            margin: 10px 0;
+            text-align: left; /* Aligner le texte à gauche pour les statistiques */
+            width: 100%; /* S'assurer que le paragraphe prend toute la largeur */
+        }
+        #pause-stats {
+            margin-bottom: 20px;
+            width: 100%;
+            padding: 0 20px; /* Ajout d'un peu de padding pour les statistiques */
+            box-sizing: border-box; /* Inclure le padding dans la largeur */
+        }
+        #pause-upgrades {
+            text-align: left;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        #pause-upgrades h3 {
+            font-size: 20px;
+            color: #f1c40f;
+            margin-bottom: 10px;
+        }
+        #pause-upgrades ul {
+            list-style: none;
+            padding: 0;
+        }
+        #pause-upgrades li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container"></div>
-    <!-- Menu principal ajouté ici -->
+    <!-- Menu principal -->
     <div id="main-menu">
-        <h1>Fantasy Survivors</h1>
+        <h1>D&D Survivors</h1>
         <p>APPUYEZ SUR N'IMPORTE QUELLE TOUCHE POUR COMMENCER</p>
+    </div>
+    <!-- Menu Pause -->
+    <div id="pause-modal" class="modal">
+        <div class="modal-content">
+            <h2>PAUSE</h2>
+            <div id="pause-stats">
+                <p id="pause-level">Niveau: </p>
+                <p id="pause-timer">Temps écoulé: </p>
+                <p id="pause-kill-count">Kills: </p>
+            </div>
+            <div id="pause-upgrades">
+                <h3>Améliorations:</h3>
+                <ul id="pause-upgrades-list"></ul>
+            </div>
+            <button onclick="resumeGame()">Reprendre</button>
+        </div>
     </div>
 </div>
 <script>
@@ -155,6 +203,7 @@
     const gameContainer = document.getElementById('game-container');
     const uiContainer = document.getElementById('ui-container');
     const mainMenu = document.getElementById('main-menu'); // Référence au menu principal
+    const pauseModal = document.getElementById('pause-modal'); // Référence au menu pause
 
     // --- Asset Loading ---
     const assets = {};
@@ -207,7 +256,8 @@
     let obstacles = [], backgroundPattern;
     // Éléments de l'interface utilisateur
     let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI,
-        levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI;
+        levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
+        pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // Nouveaux éléments UI pour la pause
     // État du jeu
     let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Ajout de gameStarted
     // État des touches du clavier
@@ -257,6 +307,17 @@
             return; // Sort de la fonction pour éviter de traiter la touche pour le mouvement
         }
         keys[e.key.toLowerCase()] = true; 
+
+        if (e.key.toLowerCase() === 'escape') { // Gère la touche Échap pour la pause
+            if (gameState.running && !debugGalleryMode) { // Ne pas pauser si le jeu est déjà terminé ou en mode debug gallery
+                if (gameState.paused) {
+                    resumeGame();
+                } else {
+                    pauseGame();
+                }
+            }
+        }
+        
         if (e.key.toLowerCase() === 'h') {
             debugMode = !debugMode; // Active/désactive le mode débogage
         }
@@ -326,7 +387,13 @@
     // Trouve l'ennemi le plus proche du joueur
     function findNearestEnemy(){let n=null,nD=Infinity;enemies.forEach(e=>{const d=Math.hypot(player.x-e.x,player.y-e.y);if(d<nD){nD=d;n=e;}});return n;}
     // Met à jour l'interface utilisateur (UI)
-    function updateUI(){levelUI.textContent=`Niveau: ${player.level}`;timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;killCountUI.textContent=`Kills: ${gameState.killCount}`;healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;}
+    function updateUI(){
+        levelUI.textContent=`Niveau: ${player.level}`;
+        timerUI.textContent=`Temps: ${Math.floor(gameState.gameTime/1000)}s`;
+        killCountUI.textContent=`Kills: ${gameState.killCount}`;
+        healthBarUI.style.width=`${(player.health/player.maxHealth)*100}%`;
+        xpBarUI.style.width=`${(player.xp/player.xpToNextLevel)*100}%`;
+    }
     // Met à jour les armes du joueur
     function updateWeapons(){const now=Date.now();const mm=player.weapons.magicMissile;if(mm.level>0&&now-mm.lastShot>mm.cooldown){const target=findNearestEnemy();if(target){mm.lastShot=now;const dx=target.x-player.x;const dy=target.y-player.y;const angle=Math.atan2(dy,dx);projectiles.push({x:player.x+player.w/2,y:player.y+player.h/2,w:10,h:10,vx:Math.cos(angle)*8,vy:Math.sin(angle)*8,damage:mm.damage,lifespan:100,angle:angle});}}
     const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
@@ -481,7 +548,7 @@
     // Boucle de jeu principale
     function gameLoop(timestamp){
         if(!gameState.running) {
-            requestAnimationFrame(gameLoop); // Continue de dessiner le menu principal
+            requestAnimationFrame(gameLoop); // Continue de dessiner le menu principal ou pause
             return;
         }
         const deltaTime=timestamp-lastTime;
@@ -510,6 +577,56 @@
         requestAnimationFrame(gameLoop); // Démarre la boucle de jeu
     }
 
+    // Fonction pour mettre le jeu en pause
+    function pauseGame() {
+        gameState.paused = true;
+        pauseModal.style.display = 'flex';
+        populatePauseStats(); // Met à jour les stats dans le menu pause
+    }
+
+    // Fonction pour reprendre le jeu
+    function resumeGame() {
+        gameState.paused = false;
+        pauseModal.style.display = 'none';
+        lastTime = performance.now(); // Réinitialise le temps pour éviter un grand deltaTime après la pause
+    }
+
+    // Fonction pour remplir les statistiques du menu pause
+    function populatePauseStats() {
+        pauseLevelUI.textContent = `Niveau: ${player.level}`;
+        pauseTimerUI.textContent = `Temps écoulé: ${Math.floor(gameState.gameTime/1000)}s`;
+        pauseKillCountUI.textContent = `Kills: ${gameState.killCount}`;
+
+        pauseUpgradesList.innerHTML = ''; // Nettoie la liste
+        const upgradeNames = {
+            magicMissile: "Missile Magique",
+            aura: "Orbes de Feu",
+            auraOfDecay: "Aura Néfaste"
+        };
+
+        for (const weaponId in player.weapons) {
+            const weapon = player.weapons[weaponId];
+            if (weapon.level > 0) {
+                const li = document.createElement('li');
+                li.textContent = `${upgradeNames[weaponId] || weaponId}: Niveau ${weapon.level}`;
+                pauseUpgradesList.appendChild(li);
+            }
+        }
+        // Pour les améliorations qui ne sont pas des armes, vérifiez manuellement ou ajoutez-les au fur et à mesure
+        // Exemple pour Max Health et Speed si elles sont pertinentes à afficher
+        if (player.maxHealth > 120) { // Si la vie max a été améliorée depuis le début
+            const li = document.createElement('li');
+            li.textContent = `Vie Max: ${player.maxHealth} (Niveau ${player.maxHealth/20 - 5})`; // Simplification pour le niveau
+            pauseUpgradesList.appendChild(li);
+        }
+        if (player.speed > 4) { // Si la vitesse a été améliorée
+            const li = document.createElement('li');
+            li.textContent = `Vitesse: ${player.speed} (Niveau ${(player.speed-4)/0.5})`;
+            pauseUpgradesList.appendChild(li);
+        }
+    }
+
+
     // Fonction d'initialisation du jeu
     function init(){
         // Initialise l'interface utilisateur
@@ -517,6 +634,12 @@
         document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
         levelUI=document.getElementById('level');timerUI=document.getElementById('timer');killCountUI=document.getElementById('kill-count');healthBarUI=document.getElementById('health-bar');xpBarUI=document.getElementById('xp-bar');levelUpModal=document.getElementById('level-up-modal');upgradeOptionsContainer=document.getElementById('upgrade-options');gameOverModal=document.getElementById('game-over-modal');finalScoreUI=document.getElementById('final-score');
         
+        // Références aux éléments du menu pause
+        pauseLevelUI = document.getElementById('pause-level');
+        pauseTimerUI = document.getElementById('pause-timer');
+        pauseKillCountUI = document.getElementById('pause-kill-count');
+        pauseUpgradesList = document.getElementById('pause-upgrades-list');
+
         // Redimensionne le canvas et crée les obstacles
         resizeCanvas();
         createBackgroundAndObstacles();
