@@ -142,7 +142,7 @@ let obstacles = [], backgroundPattern;
 // Éléments de l'interface utilisateur
 let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI, healthTextUI, xpTextUI, goldUI, // Ajout de goldUI
     levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
-    pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList, weaponIconsUI, passiveIconsUI; // Nouveaux éléments UI
+    pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList, weaponIconsUI, passiveIconsUI, tooltip; // Nouveaux éléments UI
 // État du jeu
 let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Ajout de gameStarted
 // État des touches du clavier
@@ -600,7 +600,12 @@ function populateUpgradeOptions(){
     }
 }
 // Sélectionne une amélioration
-function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
+function selectUpgrade(upgrade){
+    upgrade.apply();
+    levelUpModal.style.display='none';
+    gameState.paused=false;
+    updateStatusIcons();
+}
 
 // Gère les dégâts subis par le joueur
 function takeDamage(amount){
@@ -701,6 +706,29 @@ function formatTime(milliseconds) {
 function updateStatusIcons() {
     weaponIconsUI.innerHTML = '';
     passiveIconsUI.innerHTML = '';
+    const tooltip = document.getElementById('tooltip');
+
+    const createIcon = (listUI, upgradeDef, level, nameOverride) => {
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'status-icon';
+        iconDiv.innerHTML = `${upgradeDef.icon} <span class="level-badge">${level}</span>`;
+
+        iconDiv.addEventListener('mouseenter', (e) => {
+            tooltip.innerHTML = `${nameOverride || upgradeDef.name}: Niv. ${level}`;
+            const rect = iconDiv.getBoundingClientRect();
+            const containerRect = gameContainer.getBoundingClientRect();
+            
+            tooltip.style.left = `${rect.left - containerRect.left + rect.width + 5}px`;
+            tooltip.style.top = `${rect.top - containerRect.top}px`;
+            tooltip.style.display = 'block';
+        });
+
+        iconDiv.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+
+        listUI.appendChild(iconDiv);
+    };
 
     // Armes
     for (const weaponId in player.weapons) {
@@ -708,10 +736,7 @@ function updateStatusIcons() {
         if (weapon.level > 0) {
             const upgradeDef = availableUpgrades.find(up => up.id === weaponId);
             if (upgradeDef && upgradeDef.icon) {
-                const iconDiv = document.createElement('div');
-                iconDiv.className = 'status-icon';
-                iconDiv.innerHTML = `${upgradeDef.icon} <span class="level-badge">${weapon.level}</span>`;
-                weaponIconsUI.appendChild(iconDiv);
+                createIcon(weaponIconsUI, upgradeDef, weapon.level, upgradeDef.name);
             }
         }
     }
@@ -722,10 +747,7 @@ function updateStatusIcons() {
         if (level > 0) {
             const upgradeDef = availableUpgrades.find(up => up.id === passiveId);
             if (upgradeDef && upgradeDef.icon) {
-                 const iconDiv = document.createElement('div');
-                iconDiv.className = 'status-icon';
-                iconDiv.innerHTML = `${upgradeDef.icon} <span class="level-badge">${level}</span>`;
-                passiveIconsUI.appendChild(iconDiv);
+                 createIcon(passiveIconsUI, upgradeDef, level, upgradeDef.name);
             }
         }
     }
@@ -742,7 +764,6 @@ function updateUI(){
     healthTextUI.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
     xpTextUI.textContent = `${Math.floor(player.xp)}/${player.xpToNextLevel}`;
     goldUI.textContent = player.gold;
-    updateStatusIcons();
 }
 
 // Met à jour les armes du joueur
@@ -1124,7 +1145,7 @@ function startGame() {
         });
         toggleMusicButton.textContent = "Musique: ON";
     }
-
+    updateStatusIcons();
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -1149,6 +1170,9 @@ function quitGame() {
 
     canvas.style.display = 'none';
     uiContainer.style.display = 'none';
+    weaponIconsUI.innerHTML = '';
+    passiveIconsUI.innerHTML = '';
+
 
     enemies = [];
     projectiles = [];
@@ -1611,6 +1635,7 @@ function init(){
 
     weaponIconsUI = document.getElementById('weapon-icons');
     passiveIconsUI = document.getElementById('passive-icons');
+    tooltip = document.getElementById('tooltip');
 
     toggleMusicButton = document.getElementById('toggle-music-button');
     toggleSfxButton = document.getElementById('toggle-sfx-button');
