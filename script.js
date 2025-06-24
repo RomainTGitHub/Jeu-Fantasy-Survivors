@@ -27,6 +27,11 @@ let upgradesGrid;
 let upgradesBackButton;
 let upgradesMenuGoldUI;
 
+// Animation du menu
+let menuBackgroundCanvas, menuBgCtx;
+let menuEntities = [];
+let menuAnimationId = null;
+
 // Variable pour suivre l'état de la musique et le volume
 let isMusicOn = true; // Suppose que la musique est activée par défaut
 let musicVolume = 1; // Volume de la musique par défaut (1 = 100%)
@@ -242,6 +247,10 @@ function resizeCanvas() {
     // Redessine immédiatement après le redimensionnement pour éviter le scintillement ou un canevas vide
     if (gameState.running) {
         draw();
+    }
+    // Redimensionne le canvas du menu
+    if (menuBackgroundCanvas) {
+        menuBackgroundCanvas.width = mainMenu.clientWidth;
     }
 }
 
@@ -1088,9 +1097,8 @@ function quitGame() {
     loadGameData(); 
     updateMainMenuGoldDisplay();
 
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
+    if (!menuAnimationId) {
+        menuAnimationLoop();
     }
 }
 
@@ -1238,6 +1246,9 @@ function showUpgradesMenu() {
 function hideUpgradesMenu() {
     mainMenu.style.display = 'flex';
     permanentUpgradesMenu.style.display = 'none';
+    if (!menuAnimationId) {
+        menuAnimationLoop();
+    }
 }
 
 function setupPermanentUpgrades() {
@@ -1358,6 +1369,9 @@ function hideOptions() {
     if (returnToMenuAfterOptions === 'main') {
         mainMenu.style.display = 'flex';
         soundControlsUI.style.display = 'flex';
+        if (!menuAnimationId) {
+            menuAnimationLoop();
+        }
     } else if (returnToMenuAfterOptions === 'pause') {
         pauseModal.style.display = 'flex';
     }
@@ -1378,6 +1392,69 @@ function updateSfxVolume() {
     areSoundEffectsOn = sfxVolume > 0;
     toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
     saveGameData();
+}
+
+// Animation du menu
+function setupMenuAnimation() {
+    if (!menuBackgroundCanvas) return;
+    menuBackgroundCanvas.width = mainMenu.clientWidth;
+    menuBackgroundCanvas.height = 200; 
+
+    const entityTypes = ['player', 'goblin', 'skeleton', 'slime', 'orc'];
+    const yPos = menuBackgroundCanvas.height - 160; 
+    menuEntities = [];
+
+    entityTypes.forEach((type, index) => {
+        const def = type === 'player' ? initialPlayerState : enemyDefinitions[type];
+        if (!def) return;
+        menuEntities.push({
+            x: menuBackgroundCanvas.width + index * 200,
+            y: yPos,
+            type: type,
+            def: def,
+            anim: { frame: 0, timer: 0, speed: 15 },
+            speed: 0.5 + Math.random() * 0.5
+        });
+    });
+}
+
+function menuAnimationLoop() {
+    if (mainMenu.style.display === 'none') {
+        menuAnimationId = null;
+        return;
+    }
+
+    menuBgCtx.clearRect(0, 0, menuBackgroundCanvas.width, menuBackgroundCanvas.height);
+
+    menuEntities.forEach(entity => {
+        entity.x -= entity.speed;
+
+        entity.anim.timer++;
+        if (entity.anim.timer > entity.anim.speed) {
+            entity.anim.timer = 0;
+            entity.anim.frame = (entity.anim.frame + 1) % entity.def.frameCount;
+        }
+
+        const sprite = assets[entity.type];
+        if (sprite && sprite.complete) {
+            const frameWidth = sprite.naturalWidth / entity.def.frameCount;
+            const sourceX = entity.anim.frame * frameWidth;
+            menuBgCtx.save();
+            menuBgCtx.scale(-1, 1);
+            menuBgCtx.drawImage(
+                sprite,
+                sourceX, 0, frameWidth, sprite.naturalHeight,
+                -entity.x - entity.def.spriteW, entity.y, entity.def.spriteW, entity.def.spriteH
+            );
+            menuBgCtx.restore();
+        }
+
+        if (entity.x < -entity.def.spriteW) {
+            entity.x = menuBackgroundCanvas.width + Math.random() * 200;
+        }
+    });
+
+    menuAnimationId = requestAnimationFrame(menuAnimationLoop);
 }
 
 // Fonction d'initialisation du jeu
@@ -1435,6 +1512,9 @@ function init(){
     upgradesBackButton = document.getElementById('upgradesBackButton');
     upgradesMenuGoldUI = document.getElementById('upgrades-menu-gold');
     
+    menuBackgroundCanvas = document.getElementById('menu-background-canvas');
+    menuBgCtx = menuBackgroundCanvas.getContext('2d');
+    
     canvas.style.display = 'none';
     uiContainer.style.display = 'none';
 
@@ -1447,7 +1527,9 @@ function init(){
              backgroundPattern = ctx.createPattern(assets.background, 'repeat');
         }
         loadGameData();
-        draw(); // Dessine l'état initial
+        setupMenuAnimation();
+        menuAnimationLoop();
+        draw(); 
     });
 }
 
