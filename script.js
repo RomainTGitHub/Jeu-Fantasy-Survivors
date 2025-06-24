@@ -186,6 +186,7 @@ let camera = { x: 0, y: 0 };
 // Entités du jeu
 let projectiles = [], enemies = [], xpGems = [], goldCoins = []; // Nouveau tableau goldCoins
 let enemySpawnTimer = 0;
+let xpMergeTimer = 0; // NOUVEAU: Timer pour la fusion des gemmes d'XP
 
 // Propriétés initiales du joueur à utiliser pour la réinitialisation
 const initialPlayerState = {
@@ -516,6 +517,7 @@ function killEnemy(enemy){
             w: 32,
             h: 32,
             value:enemy.xp,
+            scale: 1, // NOUVEAU: Ajout d'une échelle initiale pour la fusion
             anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
             frameCount: gemInfo.frameCount,
             visualOffsetX: gemInfo.visualOffsetX,
@@ -551,11 +553,12 @@ function killEnemy(enemy){
     enemies=enemies.filter(en=>en!==enemy);
 }
 
-// Met à jour les gemmes d'XP (animation, magnétisme, collecte, expiration)
+// Met à jour les gemmes d'XP (animation, magnétisme, collecte, expiration et fusion)
 function updateXPGems() {
     const now = Date.now();
-    for (let i=xpGems.length-1;i>=0;i--){
-        const g=xpGems[i];
+    // Mises à jour standards (magnétisme, collecte, animation, expiration)
+    for (let i = xpGems.length - 1; i >= 0; i--) {
+        const g = xpGems[i];
 
         if (now >= g.expirationTime) {
             xpGems.splice(i, 1);
@@ -563,23 +566,67 @@ function updateXPGems() {
         }
 
         g.anim.timer++;
-        if(g.anim.timer>g.anim.speed){
-            g.anim.timer=0;
-            g.anim.frame=(g.anim.frame+1)%g.frameCount;
+        if (g.anim.timer > g.anim.speed) {
+            g.anim.timer = 0;
+            g.anim.frame = (g.anim.frame + 1) % g.frameCount;
         }
-        const dx=(player.x+player.w/2)-g.x;
-        const dy=(player.y+player.h/2)-g.y;
-        const d=Math.sqrt(dx*dx+dy*dy);
-        if(d<player.magnetRadius){
-            g.x+=(dx/d)*6;
-            g.y+=(dy/d)*6;
+        const dx = (player.x + player.w / 2) - g.x;
+        const dy = (player.y + player.h / 2) - g.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < player.magnetRadius) {
+            g.x += (dx / d) * 6;
+            g.y += (dy / d) * 6;
         }
-        if(d<player.w/2){
+        if (d < player.w / 2) {
             collectXP(g.value);
-            xpGems.splice(i,1);
+            xpGems.splice(i, 1);
+        }
+    }
+
+    // NOUVEAU: Logique de fusion
+    xpMergeTimer++;
+    if (xpMergeTimer > 30) { // Vérifie la fusion toutes les 30 images
+        xpMergeTimer = 0;
+        const mergeDistance = 35; // Distance maximale pour que les gemmes fusionnent
+        let merged = new Array(xpGems.length).fill(false);
+
+        for (let i = 0; i < xpGems.length; i++) {
+            if (merged[i]) continue;
+
+            for (let j = i + 1; j < xpGems.length; j++) {
+                if (merged[j]) continue;
+
+                const g1 = xpGems[i];
+                const g2 = xpGems[j];
+
+                const dx = g1.x - g2.x;
+                const dy = g1.y - g2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < mergeDistance) {
+                    // Fusionne g2 dans g1
+                    const totalValue = g1.value + g2.value;
+                    // Moyenne pondérée pour la nouvelle position
+                    g1.x = (g1.x * g1.value + g2.x * g2.value) / totalValue;
+                    g1.y = (g1.y * g1.value + g2.y * g2.value) / totalValue;
+                    g1.value = totalValue;
+
+                    // Met à jour l'échelle en fonction de la nouvelle valeur totale
+                    g1.scale = 1 + Math.log10(g1.value / 5 + 1);
+
+                    // Marque g2 comme fusionnée pour être supprimée plus tard
+                    merged[j] = true;
+                }
+            }
+        }
+
+        // Filtre les gemmes fusionnées pour ne garder que les autres
+        if (merged.some(m => m)) {
+            xpGems = xpGems.filter((_, index) => !merged[index]);
         }
     }
 }
+
 
 // Met à jour les pièces d'or (animation, magnétisme, collecte, expiration)
 function updateGoldCoins() {
@@ -1068,7 +1115,18 @@ function draw(){
             const frameWidth = sprite.naturalWidth / gem.frameCount;
             const frameHeight = sprite.naturalHeight;
             const sourceX = gem.anim.frame * frameWidth;
-            ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, gem.x - 16 + gem.visualOffsetX, gem.y - 16 + gem.visualOffsetY, 32, 32);
+            
+            // NOUVEAU: Applique l'échelle pour les gemmes fusionnées
+            const drawScale = gem.scale || 1;
+            const drawWidth = gem.w * drawScale;
+            const drawHeight = gem.h * drawScale;
+            
+            // Dessine la gemme centrée
+            ctx.drawImage(sprite, 
+                sourceX, 0, frameWidth, frameHeight, 
+                gem.x - drawWidth / 2 + (gem.visualOffsetX || 0), 
+                gem.y - drawHeight / 2 + (gem.visualOffsetY || 0), 
+                drawWidth, drawHeight);
         }
     });
 
