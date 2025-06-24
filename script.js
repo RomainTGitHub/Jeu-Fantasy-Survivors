@@ -184,9 +184,9 @@ let debugGalleryMode = false;
 // Caméra du jeu
 let camera = { x: 0, y: 0 };
 // Entités du jeu
-let projectiles = [], enemies = [], xpGems = [], goldCoins = []; // Nouveau tableau goldCoins
+let projectiles = [], enemies = [], xpGems = [], goldCoins = [], specialPickups = []; // NOUVEAU: Tableau pour les objets spéciaux
 let enemySpawnTimer = 0;
-let xpMergeTimer = 0; // NOUVEAU: Timer pour la fusion des gemmes d'XP
+let xpMergeTimer = 0; // Timer pour la fusion des gemmes d'XP
 
 // Propriétés initiales du joueur à utiliser pour la réinitialisation
 const initialPlayerState = {
@@ -509,6 +509,7 @@ function killEnemy(enemy){
     enemy.isDead=true;
     gameState.killCount++;
     persistentStats.totalKills++;
+    // Chance de laisser tomber une gemme d'XP
     if(Math.random()<0.8){
         const gemInfo = itemDefinitions.xpGem;
         xpGems.push({
@@ -517,7 +518,7 @@ function killEnemy(enemy){
             w: 32,
             h: 32,
             value:enemy.xp,
-            scale: 1, // NOUVEAU: Ajout d'une échelle initiale pour la fusion
+            scale: 1, // Échelle initiale pour la fusion
             anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
             frameCount: gemInfo.frameCount,
             visualOffsetX: gemInfo.visualOffsetX,
@@ -526,6 +527,7 @@ function killEnemy(enemy){
         });
     }
 
+    // Chance de laisser tomber de l'or
     let dropChance = 0;
     switch (enemy.type) {
         case 'goblin': dropChance = 0.10; break;
@@ -550,6 +552,19 @@ function killEnemy(enemy){
         });
     }
 
+    // NOUVEAU: Chance de laisser tomber un aimant
+    if (Math.random() < 0.01) { // 1% de chance
+        specialPickups.push({
+            x: enemy.x + enemy.w / 2,
+            y: enemy.y + enemy.h / 2,
+            w: 32,
+            h: 32,
+            type: 'magnet',
+            expirationTime: Date.now() + 15000 // Dure 15 secondes au sol
+        });
+    }
+
+
     enemies=enemies.filter(en=>en!==enemy);
 }
 
@@ -573,17 +588,21 @@ function updateXPGems() {
         const dx = (player.x + player.w / 2) - g.x;
         const dy = (player.y + player.h / 2) - g.y;
         const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < player.magnetRadius) {
-            g.x += (dx / d) * 6;
-            g.y += (dy / d) * 6;
+        
+        // MODIFIÉ: Attraction par l'aimant normal OU l'aimant spécial
+        if (g.isPulledBySuperMagnet || d < player.magnetRadius) {
+            const speed = g.isPulledBySuperMagnet ? 15 : 6; // L'aimant spécial est plus rapide
+            g.x += (dx / d) * speed;
+            g.y += (dy / d) * speed;
         }
+
         if (d < player.w / 2) {
             collectXP(g.value);
             xpGems.splice(i, 1);
         }
     }
 
-    // NOUVEAU: Logique de fusion
+    // Logique de fusion
     xpMergeTimer++;
     if (xpMergeTimer > 30) { // Vérifie la fusion toutes les 30 images
         xpMergeTimer = 0;
@@ -649,9 +668,11 @@ function updateGoldCoins() {
         const dy = (player.y + player.h / 2) - coin.y;
         const d = Math.sqrt(dx * dx + dy * dy);
 
-        if (d < player.magnetRadius) {
-            coin.x += (dx / d) * 6;
-            coin.y += (dy / d) * 6;
+        // MODIFIÉ: Attraction par l'aimant normal OU l'aimant spécial
+        if (coin.isPulledBySuperMagnet || d < player.magnetRadius) {
+            const speed = coin.isPulledBySuperMagnet ? 15 : 6; // L'aimant spécial est plus rapide
+            coin.x += (dx / d) * speed;
+            coin.y += (dy / d) * speed;
         }
 
         if (d < player.w / 2) {
@@ -661,6 +682,39 @@ function updateGoldCoins() {
         }
     }
 }
+
+// NOUVEAU: Met à jour les objets spéciaux comme l'aimant
+function updateSpecialPickups() {
+    const now = Date.now();
+    for (let i = specialPickups.length - 1; i >= 0; i--) {
+        const pickup = specialPickups[i];
+
+        if (now >= pickup.expirationTime) {
+            specialPickups.splice(i, 1);
+            continue;
+        }
+
+        // Vérifie la collision avec le joueur
+        const playerHitbox = getHitbox(player);
+        const pickupHitbox = { x: pickup.x - pickup.w / 2, y: pickup.y - pickup.h / 2, w: pickup.w, h: pickup.h };
+
+        if (checkCollision(playerHitbox, pickupHitbox)) {
+            if (pickup.type === 'magnet') {
+                activateSuperMagnet();
+            }
+            // Retire l'objet du jeu
+            specialPickups.splice(i, 1);
+        }
+    }
+}
+
+// NOUVEAU: Active l'effet de l'aimant spécial
+function activateSuperMagnet() {
+    // Marque toutes les gemmes et pièces pour qu'elles soient attirées
+    xpGems.forEach(gem => gem.isPulledBySuperMagnet = true);
+    goldCoins.forEach(coin => coin.isPulledBySuperMagnet = true);
+}
+
 
 // Collecte de l'XP et vérifie si le joueur monte de niveau
 function collectXP(amount){
@@ -1116,7 +1170,7 @@ function draw(){
             const frameHeight = sprite.naturalHeight;
             const sourceX = gem.anim.frame * frameWidth;
             
-            // NOUVEAU: Applique l'échelle pour les gemmes fusionnées
+            // Applique l'échelle pour les gemmes fusionnées
             const drawScale = gem.scale || 1;
             const drawWidth = gem.w * drawScale;
             const drawHeight = gem.h * drawScale;
@@ -1137,6 +1191,22 @@ function draw(){
             const frameHeight = sprite.naturalHeight;
             const sourceX = coin.anim.frame * frameWidth;
             ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, coin.x - 16 + coin.visualOffsetX, coin.y - 16 + coin.visualOffsetY, 32, 32);
+        }
+    });
+
+    // NOUVEAU: Dessine les objets spéciaux
+    specialPickups.forEach(pickup => {
+        if (isEntityOnScreen(pickup)) {
+            if (pickup.type === 'magnet') {
+                ctx.font = '28px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const pulse = Math.sin(Date.now() / 150) * 4;
+                ctx.shadowColor = "cyan";
+                ctx.shadowBlur = 15 + pulse;
+                ctx.fillText('🧲', pickup.x, pickup.y);
+                ctx.shadowBlur = 0;
+            }
         }
     });
 
@@ -1321,6 +1391,7 @@ function gameLoop(timestamp){
         updateProjectiles();
         updateXPGems();
         updateGoldCoins();
+        updateSpecialPickups(); // NOUVEAU: Appel de la fonction de mise à jour
         updatePlayerRegeneration(deltaTime);
         updatePlayerInvincibility();
         gameState.gameTime+=deltaTime;
@@ -1400,6 +1471,7 @@ function quitGame() {
     projectiles = [];
     xpGems = [];
     goldCoins = [];
+    specialPickups = []; // NOUVEAU: Réinitialiser les objets spéciaux
     enemySpawnTimer = 0;
 
     gameState.running = false;
