@@ -28,6 +28,7 @@
         <!-- Menu des améliorations permanentes -->
         <div id="permanent-upgrades-menu" class="modal">
             <div class="modal-content">
+                <button id="resetUpgradesButton">Reset</button>
                 <h2>Améliorations</h2>
                 <div id="upgrades-grid">
                     <!-- Les boutons d'amélioration seront ajoutés ici par JS -->
@@ -36,6 +37,17 @@
                 <button id="upgradesBackButton">Retour</button>
             </div>
         </div>
+
+        <!-- Modal de confirmation de réinitialisation -->
+        <div id="reset-confirmation-modal" class="modal">
+            <div class="modal-content">
+                <h2>Réinitialiser?</h2>
+                <p>Toutes vos améliorations seront réinitialisées et votre or sera remboursé. Êtes-vous sûr ?</p>
+                <button id="confirmResetButton">Oui</button>
+                <button id="cancelResetButton">Non</button>
+            </div>
+        </div>
+
 
         <!-- Menu Pause -->
         <div id="pause-modal" class="modal">

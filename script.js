@@ -26,6 +26,8 @@ let permanentUpgradesMenu;
 let upgradesGrid;
 let upgradesBackButton;
 let upgradesMenuGoldUI;
+let resetUpgradesButton;
+let resetConfirmationModal;
 
 // Animation du menu
 let menuBackgroundCanvas, menuBgCtx;
@@ -40,10 +42,11 @@ let sfxVolume = 1; // Volume des effets sonores par défaut (1 = 100%)
 
 // --- Améliorations permanentes ---
 let permanentUpgrades = {
-    maxHealth: { level: 0, cost: 500, maxLevel: 10 },
-    speed: { level: 0, cost: 500, maxLevel: 10 },
-    damage: { level: 0, cost: 500, maxLevel: 10 },
-    regeneration: { level: 0, cost: 500, maxLevel: 10 }
+    maxHealth: { level: 0, initialCost: 50, maxLevel: 10 },
+    speed: { level: 0, initialCost: 50, maxLevel: 10 },
+    damage: { level: 0, initialCost: 50, maxLevel: 10 },
+    regeneration: { level: 0, initialCost: 50, maxLevel: 10 },
+    areaOfEffect: { level: 0, initialCost: 50, maxLevel: 10 }
 };
 
 const permanentUpgradeDefinitions = {
@@ -65,6 +68,11 @@ const permanentUpgradeDefinitions = {
     regeneration: {
         emoji: '✚',
         title: 'Régénération',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    areaOfEffect: {
+        emoji: '💥',
+        title: 'Zone d\'Effet',
         description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
     }
 };
@@ -134,7 +142,7 @@ let obstacles = [], backgroundPattern;
 // Éléments de l'interface utilisateur
 let levelUI, timerUI, killCountUI, healthBarUI, xpBarUI, healthTextUI, xpTextUI, goldUI, // Ajout de goldUI
     levelUpModal, upgradeOptionsContainer, gameOverModal, finalScoreUI,
-    pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList; // Nouveaux éléments UI pour la pause
+    pauseLevelUI, pauseTimerUI, pauseKillCountUI, pauseUpgradesList, weaponIconsUI, passiveIconsUI; // Nouveaux éléments UI
 // État du jeu
 let gameState = { running: false, paused: true, gameTime: 0, killCount: 0, gameStarted: false }; // Ajout de gameStarted
 // État des touches du clavier
@@ -157,12 +165,18 @@ const initialPlayerState = {
     invincible: false,
     invincibilityEndTime: 0,
     damageMultiplier: 1,
+    aoeMultiplier: 1,
     anim: { frame: 0, timer: 0, speed: 15, isMoving: false, facingRight: true },
     frameCount: 4, // Ajout de frameCount à initialPlayerState
     weapons: {
         magicMissile: { level: 1, cooldown: 1200, lastShot: 0, damage: 12 },
         aura: { level: 0, radius: 80, damage: 5, cooldown: 100, lastTick: 0, orbCount: 0, rotation: 0 },
         auraOfDecay: { level: 0, radius: 120, damage: 2, cooldown: 500, lastTick: 0 }
+    },
+    passiveLevels: {
+        maxHealth: 0,
+        speed: 0,
+        regeneration: 0
     },
 };
 
@@ -181,6 +195,7 @@ function resetPlayerState() {
     player.speed += permanentUpgrades.speed.level * 0.1;
     player.regenerationRate += permanentUpgrades.regeneration.level * 0.1;
     player.damageMultiplier = 1 + (permanentUpgrades.damage.level * 0.05);
+    player.aoeMultiplier = 1 + (permanentUpgrades.areaOfEffect.level * 0.05);
 }
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
@@ -211,6 +226,7 @@ const availableUpgrades=[
     {
         id:'magicMissile',
         name:'Missile Magique',
+        icon: '☄️',
         description:(l)=>l===0?'Lance un projectile magique.':`+ rapide, + dégâts.`,
         apply:()=>{
             const w=player.weapons.magicMissile;
@@ -220,15 +236,16 @@ const availableUpgrades=[
             w.damage+=5;
         }
     },
-    {id:'aura',name:'Orbes de Feu',description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
-    {id:'auraOfDecay',name:'Aura Néfaste',description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},
-    {id:'maxHealth',name:'Coeur robuste',description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth;}},
-    {id:'speed',name:'Bottes de vitesse',description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5;}},
+    {id:'aura',name:'Orbes de Feu', icon: '🔥', description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
+    {id:'auraOfDecay',name:'Aura Néfaste', icon: '☠️', description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},
+    {id:'maxHealth',name:'Coeur robuste', icon: '❤️', description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth; player.passiveLevels.maxHealth++; }},
+    {id:'speed',name:'Bottes de vitesse', icon: '👟', description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5; player.passiveLevels.speed++; }},
     {
         id:'regeneration',
         name:'Régénération',
-        description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description de l'amélioration
-        apply:()=>{player.regenerationRate+=1;}
+        icon: '✚',
+        description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`,
+        apply:()=>{player.regenerationRate+=0.5; player.passiveLevels.regeneration++;}
     }
 ];
 
@@ -567,7 +584,21 @@ function levelUp(){
 }
 
 // Remplit les options d'amélioration
-function populateUpgradeOptions(){upgradeOptionsContainer.innerHTML='';const c=[],a=[...availableUpgrades];while(c.length<3&&a.length>0){const r=Math.floor(Math.random()*a.length);const o=a[r];const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;const d=document.createElement('div');d.className='upgrade-option';d.innerHTML=`<strong>${o.name}</strong><br><small>${o.description(wL)}</small>`;d.onclick=()=>selectUpgrade(o);upgradeOptionsContainer.appendChild(d);c.push(o);a.splice(r,1);}}
+function populateUpgradeOptions(){
+    upgradeOptionsContainer.innerHTML='';
+    const c=[],a=[...availableUpgrades];
+    while(c.length<3&&a.length>0){
+        const r=Math.floor(Math.random()*a.length);
+        const o=a[r];
+        const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;
+        const d=document.createElement('div');
+        d.className='upgrade-option';
+        d.innerHTML=`<div class="upgrade-icon">${o.icon}</div><div><strong>${o.name}</strong><br><small>${o.description(wL)}</small></div>`;
+        d.onclick=()=>selectUpgrade(o);
+        upgradeOptionsContainer.appendChild(d);c.push(o);
+        a.splice(r,1);
+    }
+}
 // Sélectionne une amélioration
 function selectUpgrade(upgrade){upgrade.apply();levelUpModal.style.display='none';gameState.paused=false;}
 
@@ -666,6 +697,41 @@ function formatTime(milliseconds) {
     return `${pad(minutes)}:${pad(seconds)}:${pad(ms)}`;
 }
 
+// Met à jour les icônes de statut
+function updateStatusIcons() {
+    weaponIconsUI.innerHTML = '';
+    passiveIconsUI.innerHTML = '';
+
+    // Armes
+    for (const weaponId in player.weapons) {
+        const weapon = player.weapons[weaponId];
+        if (weapon.level > 0) {
+            const upgradeDef = availableUpgrades.find(up => up.id === weaponId);
+            if (upgradeDef && upgradeDef.icon) {
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'status-icon';
+                iconDiv.innerHTML = `${upgradeDef.icon} <span class="level-badge">${weapon.level}</span>`;
+                weaponIconsUI.appendChild(iconDiv);
+            }
+        }
+    }
+
+    // Passifs
+    for (const passiveId in player.passiveLevels) {
+        const level = player.passiveLevels[passiveId];
+        if (level > 0) {
+            const upgradeDef = availableUpgrades.find(up => up.id === passiveId);
+            if (upgradeDef && upgradeDef.icon) {
+                 const iconDiv = document.createElement('div');
+                iconDiv.className = 'status-icon';
+                iconDiv.innerHTML = `${upgradeDef.icon} <span class="level-badge">${level}</span>`;
+                passiveIconsUI.appendChild(iconDiv);
+            }
+        }
+    }
+}
+
+
 // Met à jour l'interface utilisateur (UI)
 function updateUI(){
     levelUI.textContent=`Niveau: ${player.level}`;
@@ -676,6 +742,7 @@ function updateUI(){
     healthTextUI.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
     xpTextUI.textContent = `${Math.floor(player.xp)}/${player.xpToNextLevel}`;
     goldUI.textContent = player.gold;
+    updateStatusIcons();
 }
 
 // Met à jour les armes du joueur
@@ -702,8 +769,8 @@ function updateWeapons(){
             projectiles.push({
                 x:player.x+player.w/2,
                 y:player.y+player.h/2,
-                w:mmDef.drawW,
-                h:mmDef.drawH,
+                w:mmDef.drawW * player.aoeMultiplier,
+                h:mmDef.drawH * player.aoeMultiplier,
                 vx:Math.cos(angle)*8,
                 vy:Math.sin(angle)*8,
                 damage: mm.damage * player.damageMultiplier,
@@ -717,8 +784,8 @@ function updateWeapons(){
             });
         }
     }
-    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=(aura.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=(aod.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
+    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=24 * player.aoeMultiplier,orbH=24 * player.aoeMultiplier;const effectiveAuraRadius = aura.radius * player.aoeMultiplier;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*effectiveAuraRadius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*effectiveAuraRadius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=(aura.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
+    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;const effectiveAodRadius = aod.radius * player.aoeMultiplier;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<effectiveAodRadius){enemy.currentHealth-=(aod.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
 }
 // Met à jour les projectiles
 function updateProjectiles(){
@@ -924,7 +991,8 @@ function draw(){
     const aod=player.weapons.auraOfDecay;
     if(aod.level>0){
         ctx.beginPath();
-        const pulse=aod.radius+(Math.sin(Date.now()/200)*5);
+        const effectiveAodRadius = aod.radius * player.aoeMultiplier;
+        const pulse=effectiveAodRadius+(Math.sin(Date.now()/200)*5);
         const centerX = player.x + player.w / 2;
         const centerY = player.y + player.h / 2;
         const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, pulse);
@@ -972,7 +1040,7 @@ function draw(){
         }
     });
 
-    const aura=player.weapons.aura;if(aura.level>0){const orbW=24,orbH=24;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
+    const aura=player.weapons.aura;if(aura.level>0){const orbW=24 * player.aoeMultiplier,orbH=24 * player.aoeMultiplier;const effectiveAuraRadius = aura.radius * player.aoeMultiplier;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbX=player.x+player.w/2+Math.cos(angle)*effectiveAuraRadius-orbW/2;const orbY=player.y+player.h/2+Math.sin(angle)*effectiveAuraRadius-orbH/2;const gradient=ctx.createRadialGradient(orbX+orbW/2,orbY+orbH/2,1,orbX+orbW/2,orbY+orbH/2,orbW/2);gradient.addColorStop(0,'#f1c40f');gradient.addColorStop(1,'rgba(230,126,34,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(orbX+orbW/2,orbY+orbH/2,orbW/2,0,Math.PI*2);ctx.fill();}}
 
     ctx.restore();
 }
@@ -1035,6 +1103,11 @@ function startGame() {
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
+    }
+    
+    if (menuAnimationId) {
+        cancelAnimationFrame(menuAnimationId);
+        menuAnimationId = null;
     }
 
     resetPlayerState(); 
@@ -1147,15 +1220,18 @@ function populatePauseStats() {
         const li = document.createElement('li');
         const level = currentUpgrades[upgradeId];
         const displayName = upgradeDisplayNames[upgradeId] || upgradeId;
+        const upgradeDef = availableUpgrades.find(up => up.id === upgradeId);
+        const icon = upgradeDef ? `<span class="pause-upgrade-icon">${upgradeDef.icon}</span>` : '';
+
 
         if (upgradeId === 'regeneration') {
-            li.textContent = `${displayName}: +${level.toFixed(1)} PV/sec`;
+            li.innerHTML = `${icon} ${displayName}: +${level.toFixed(1)} PV/sec`;
         } else if (upgradeId === 'maxHealth') {
-             li.textContent = `${displayName}: +${level * 20} Vie Max`;
+             li.innerHTML = `${icon} ${displayName}: +${level * 20} Vie Max`;
         } else if (upgradeId === 'speed') {
-            li.textContent = `${displayName}: Niveau ${level}`;
+            li.innerHTML = `${icon} ${displayName}: Niveau ${level}`;
         } else {
-            li.textContent = `${displayName}: Niveau ${level}`;
+            li.innerHTML = `${icon} ${displayName}: Niveau ${level}`;
         }
         pauseUpgradesList.appendChild(li);
     }
@@ -1168,8 +1244,8 @@ function loadGameData() {
         if (storedUpgrades) {
             const savedUpgrades = JSON.parse(storedUpgrades);
             for (const key in permanentUpgrades) {
-                if (savedUpgrades[key]) {
-                    permanentUpgrades[key] = savedUpgrades[key];
+                if (savedUpgrades[key] && savedUpgrades[key].level !== undefined) {
+                    permanentUpgrades[key].level = savedUpgrades[key].level;
                 }
             }
         }
@@ -1236,8 +1312,17 @@ function updateMainMenuGoldDisplay() {
 }
 
 // Fonctions pour le menu des améliorations permanentes
+function getUpgradeCost(upgrade) {
+    if (upgrade.level >= upgrade.maxLevel) return Infinity;
+    return upgrade.initialCost * Math.pow(2, upgrade.level);
+}
+
 function showUpgradesMenu() {
     mainMenu.style.display = 'none';
+    if(menuAnimationId) {
+        cancelAnimationFrame(menuAnimationId);
+        menuAnimationId = null;
+    }
     permanentUpgradesMenu.style.display = 'flex';
     updateMainMenuGoldDisplay();
     setupPermanentUpgrades();
@@ -1269,8 +1354,10 @@ function setupPermanentUpgrades() {
 
 function buyPermanentUpgrade(key) {
     const upgrade = permanentUpgrades[key];
-    if (player.gold >= upgrade.cost && upgrade.level < upgrade.maxLevel) {
-        player.gold -= upgrade.cost;
+    const currentCost = getUpgradeCost(upgrade);
+
+    if (player.gold >= currentCost && upgrade.level < upgrade.maxLevel) {
+        player.gold -= currentCost;
         upgrade.level++;
         
         saveGameData();
@@ -1284,10 +1371,11 @@ function buyPermanentUpgrade(key) {
 function updateUpgradeButton(btn, key) {
     const upgrade = permanentUpgrades[key];
     const def = permanentUpgradeDefinitions[key];
+    const currentCost = getUpgradeCost(upgrade);
     
     let costText = "MAX";
     if (upgrade.level < upgrade.maxLevel) {
-        costText = `Coût: ${upgrade.cost} or`;
+        costText = `Coût: ${currentCost} or`;
     }
 
     btn.innerHTML = `
@@ -1299,11 +1387,31 @@ function updateUpgradeButton(btn, key) {
         <div class="upgrade-cost">${costText}</div>
     `;
 
-    if (upgrade.level >= upgrade.maxLevel || player.gold < upgrade.cost) {
+    if (upgrade.level >= upgrade.maxLevel || player.gold < currentCost) {
         btn.disabled = true;
     } else {
         btn.disabled = false;
     }
+}
+
+function resetAllUpgrades() {
+    let totalRefund = 0;
+    for (const key in permanentUpgrades) {
+        const upgrade = permanentUpgrades[key];
+        if (upgrade.level > 0) {
+             for(let i = 0; i < upgrade.level; i++) {
+                totalRefund += upgrade.initialCost * Math.pow(2, i);
+             }
+        }
+        upgrade.level = 0;
+    }
+
+    player.gold += totalRefund;
+
+    saveGameData();
+    updateMainMenuGoldDisplay();
+    setupPermanentUpgrades();
+    resetConfirmationModal.style.display = 'none';
 }
 
 
@@ -1401,7 +1509,6 @@ function setupMenuAnimation() {
     menuBackgroundCanvas.height = 200; 
 
     const entityTypes = ['player', 'goblin', 'skeleton', 'slime', 'orc'];
-    const yPos = menuBackgroundCanvas.height - 160; 
     menuEntities = [];
 
     entityTypes.forEach((type, index) => {
@@ -1409,7 +1516,7 @@ function setupMenuAnimation() {
         if (!def) return;
         menuEntities.push({
             x: menuBackgroundCanvas.width + index * 200,
-            y: yPos,
+            y: menuBackgroundCanvas.height - 160,
             type: type,
             def: def,
             anim: { frame: 0, timer: 0, speed: 15 },
@@ -1473,6 +1580,10 @@ function init(){
             <div id="health-bar" style="width: 100%;"></div>
             <span id="health-text" class="bar-text">120/120</span>
         </div>
+        <div id="status-icons-container">
+            <div id="weapon-icons" class="icon-row"></div>
+            <div id="passive-icons" class="icon-row"></div>
+        </div>
         <div id="gold-display">
             Or: <span id="gold-count">0</span>
         </div>
@@ -1498,6 +1609,9 @@ function init(){
     pauseKillCountUI = document.getElementById('pause-kill-count');
     pauseUpgradesList = document.getElementById('pause-upgrades-list');
 
+    weaponIconsUI = document.getElementById('weapon-icons');
+    passiveIconsUI = document.getElementById('passive-icons');
+
     toggleMusicButton = document.getElementById('toggle-music-button');
     toggleSfxButton = document.getElementById('toggle-sfx-button');
     soundControlsUI = document.getElementById('sound-controls');
@@ -1511,6 +1625,8 @@ function init(){
     upgradesGrid = document.getElementById('upgrades-grid');
     upgradesBackButton = document.getElementById('upgradesBackButton');
     upgradesMenuGoldUI = document.getElementById('upgrades-menu-gold');
+    resetUpgradesButton = document.getElementById('resetUpgradesButton');
+    resetConfirmationModal = document.getElementById('reset-confirmation-modal');
     
     menuBackgroundCanvas = document.getElementById('menu-background-canvas');
     menuBgCtx = menuBackgroundCanvas.getContext('2d');
@@ -1558,6 +1674,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     upgradesBackButton.addEventListener('click', hideUpgradesMenu);
     optionsBackButton.addEventListener('click', hideOptions);
+    
+    resetUpgradesButton.addEventListener('click', () => {
+        resetConfirmationModal.style.display = 'flex';
+    });
+    document.getElementById('confirmResetButton').addEventListener('click', resetAllUpgrades);
+    document.getElementById('cancelResetButton').addEventListener('click', () => {
+        resetConfirmationModal.style.display = 'none';
+    });
+
 
     musicVolumeSlider.addEventListener('input', updateMusicVolume);
     sfxVolumeSlider.addEventListener('input', updateSfxVolume);
