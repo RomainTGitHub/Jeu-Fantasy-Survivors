@@ -40,13 +40,19 @@ let musicVolume = 1; // Volume de la musique par défaut (1 = 100%)
 let areSoundEffectsOn = true; // Suppose que les effets sonores sont activés par défaut
 let sfxVolume = 1; // Volume des effets sonores par défaut (1 = 100%)
 
+// --- Constantes d'optimisation ---
+const MAX_ENEMIES = 150; // Limite le nombre maximum d'ennemis à l'écran
+const CULLING_BUFFER = 200; // Marge autour de l'écran pour le traitement des entités
+
 // --- Améliorations permanentes ---
 let permanentUpgrades = {
     maxHealth: { level: 0, initialCost: 50, maxLevel: 10 },
     speed: { level: 0, initialCost: 50, maxLevel: 10 },
     damage: { level: 0, initialCost: 50, maxLevel: 10 },
     regeneration: { level: 0, initialCost: 50, maxLevel: 10 },
-    areaOfEffect: { level: 0, initialCost: 50, maxLevel: 10 }
+    areaOfEffect: { level: 0, initialCost: 50, maxLevel: 10 },
+    pickupRange: { level: 0, initialCost: 50, maxLevel: 10 },
+    xpGain: { level: 0, initialCost: 50, maxLevel: 10 }
 };
 
 const permanentUpgradeDefinitions = {
@@ -73,6 +79,16 @@ const permanentUpgradeDefinitions = {
     areaOfEffect: {
         emoji: '💥',
         title: 'Zone d\'Effet',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    pickupRange: {
+        emoji: '🧲',
+        title: 'Aimant',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    xpGain: {
+        emoji: '⭐',
+        title: 'Gain d\'XP',
         description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
     }
 };
@@ -166,12 +182,14 @@ const initialPlayerState = {
     invincibilityEndTime: 0,
     damageMultiplier: 1,
     aoeMultiplier: 1,
+    xpMultiplier: 1,
     anim: { frame: 0, timer: 0, speed: 15, isMoving: false, facingRight: true },
     frameCount: 4, // Ajout de frameCount à initialPlayerState
     weapons: {
         magicMissile: { level: 1, cooldown: 1200, lastShot: 0, damage: 12 },
         aura: { level: 0, radius: 80, damage: 5, cooldown: 100, lastTick: 0, orbCount: 0, rotation: 0 },
-        auraOfDecay: { level: 0, radius: 120, damage: 2, cooldown: 500, lastTick: 0 }
+        auraOfDecay: { level: 0, radius: 120, damage: 2, cooldown: 500, lastTick: 0 },
+        boomerang: { level: 0, cooldown: 3000, lastShot: 0, damage: 15 }
     },
     passiveLevels: {
         maxHealth: 0,
@@ -196,6 +214,8 @@ function resetPlayerState() {
     player.regenerationRate += permanentUpgrades.regeneration.level * 0.1;
     player.damageMultiplier = 1 + (permanentUpgrades.damage.level * 0.05);
     player.aoeMultiplier = 1 + (permanentUpgrades.areaOfEffect.level * 0.05);
+    player.magnetRadius = initialPlayerState.magnetRadius * (1 + (permanentUpgrades.pickupRange.level * 0.10));
+    player.xpMultiplier = 1 + (permanentUpgrades.xpGain.level * 0.10);
 }
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
@@ -218,6 +238,11 @@ const projectileDefinitions = {
         maxTrailLength: 10, // Nombre maximum de points de traînée
         trailOpacityStart: 0.8, // Opacité pour le point de traînée le plus récent
         trailOpacityEnd: 0.1, // Opacité pour le point de traînée le plus ancien
+    },
+    boomerang: {
+        drawW: 40,
+        drawH: 20,
+        rotationSpeed: 0.2
     }
 };
 
@@ -238,6 +263,7 @@ const availableUpgrades=[
     },
     {id:'aura',name:'Orbes de Feu', icon: '🔥', description:(l)=>l===0?'Un orbe de feu vous protège.':`+1 orbe, + dégâts.`,apply:()=>{const w=player.weapons.aura;w.level++;w.orbCount=w.level;w.damage+=3;if(w.level>1)w.radius+=10;}},
     {id:'auraOfDecay',name:'Aura Néfaste', icon: '☠️', description:(l)=>l===0?'Une aura qui blesse les ennemis proches.':`+ grande zone, + de dégâts.`,apply:()=>{const w=player.weapons.auraOfDecay;w.level++;w.damage+=2;w.radius+=20;}},
+    {id:'boomerang', name:'Boomerang', icon: '🔄', description:(l)=>l===0?'Lance un boomerang qui traverse les ennemis.':`+1 boomerang, + dégâts.`,apply:()=>{const w=player.weapons.boomerang; w.level++; w.damage+=10; w.cooldown = Math.max(1000, w.cooldown * 0.9);}},
     {id:'maxHealth',name:'Coeur robuste', icon: '❤️', description:()=>`+20 Vie max, soigne complètement.`,apply:()=>{player.maxHealth+=20;player.health=player.maxHealth; player.passiveLevels.maxHealth++; }},
     {id:'speed',name:'Bottes de vitesse', icon: '👟', description:()=>`Augmente la vitesse.`,apply:()=>{player.speed+=0.5; player.passiveLevels.speed++; }},
     {
@@ -316,6 +342,7 @@ function updatePlayer(){if(!gameState.running||gameState.paused)return;let dx=0,
 // Fait apparaître les ennemis
 function spawnEnemies(){
     if(gameState.paused)return;
+    if (enemies.length >= MAX_ENEMIES) return; // OPTIMISATION: Limite le nombre d'ennemis
 
     const initialSpawnDelay = 2000;
     const minSpawnDelay = 300;
@@ -378,16 +405,16 @@ function getEnemyTypeByTime(){
 // Met à jour la position et l'animation des ennemis
 function updateEnemies() {
     const now = Date.now();
+    const onScreenEnemies = enemies.filter(e => isEntityOnScreen(e));
 
-    // 1. Déplacer tous les ennemis vers le joueur
-    enemies.forEach(e => {
+    onScreenEnemies.forEach(e => {
+        // Mouvement vers le joueur
         const dx = player.x - e.x;
         const dy = player.y - e.y;
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > 1) {
             const mx = (dx / d) * e.speed;
             const my = (dy / d) * e.speed;
-
             const nextPos = getHitbox(e);
             nextPos.x += mx;
             if (!checkCollisionWithObjects(nextPos, obstacles)) e.x += mx;
@@ -395,15 +422,31 @@ function updateEnemies() {
             nextPos.y += my;
             if (!checkCollisionWithObjects(nextPos, obstacles)) e.y += my;
         }
+
+        // Collision avec le joueur
+        if (checkCollision(getHitbox(player), getHitbox(e))) {
+            const damageCooldown = 1000;
+            if (now - e.lastDamageTime > damageCooldown) {
+                takeDamage(e.damage);
+                e.lastDamageTime = now;
+            }
+        }
+
+        // Animation
+        e.anim.timer++;
+        if (e.anim.timer > e.anim.speed) {
+            e.anim.timer = 0;
+            e.anim.frame = (e.anim.frame + 1) % e.frameCount;
+        }
     });
 
-    // 2. Résoudre les collisions ennemi-ennemi (exécuter plusieurs fois pour la stabilité)
-    const resolutionIterations = 3;
+    // Collision ennemi-ennemi (optimisé pour ne vérifier que les ennemis à l'écran)
+    const resolutionIterations = 2; // Réduit les itérations pour la performance
     for (let iter = 0; iter < resolutionIterations; iter++) {
-        for (let i = 0; i < enemies.length; i++) {
-            for (let j = i + 1; j < enemies.length; j++) {
-                const e1 = enemies[i];
-                const e2 = enemies[j];
+        for (let i = 0; i < onScreenEnemies.length; i++) {
+            for (let j = i + 1; j < onScreenEnemies.length; j++) {
+                const e1 = onScreenEnemies[i];
+                const e2 = onScreenEnemies[j];
                 const hitbox1 = getHitbox(e1);
                 const hitbox2 = getHitbox(e2);
 
@@ -412,7 +455,7 @@ function updateEnemies() {
                     const dx = e1.x - e2.x;
                     const dy = e1.y - e2.y;
                     const d = Math.sqrt(dx * dx + dy * dy);
-                    const push = 0.5; // Force de répulsion par itération
+                    const push = 0.5; // Force de répulsion
 
                     let moveX = 0;
                     let moveY = 0;
@@ -420,12 +463,11 @@ function updateEnemies() {
                     if (d > 0) {
                         moveX = (dx / d) * push;
                         moveY = (dy / d) * push;
-                    } else { // S'ils sont exactement superposés, pousser au hasard
+                    } else { // S'ils sont exactement superposés
                         moveX = (Math.random() - 0.5) * push;
                         moveY = (Math.random() - 0.5) * push;
                     }
 
-                    // Déplacer e1
                     const nextPos1 = getHitbox(e1);
                     nextPos1.x += moveX;
                     if (!checkCollisionWithObjects(nextPos1, obstacles)) e1.x += moveX;
@@ -433,7 +475,6 @@ function updateEnemies() {
                     nextPos1.y += moveY;
                     if (!checkCollisionWithObjects(nextPos1, obstacles)) e1.y += moveY;
 
-                    // Déplacer e2
                     const nextPos2 = getHitbox(e2);
                     nextPos2.x -= moveX;
                     if (!checkCollisionWithObjects(nextPos2, obstacles)) e2.x -= moveX;
@@ -444,22 +485,6 @@ function updateEnemies() {
             }
         }
     }
-
-    // 3. Vérifier les dégâts au joueur et mettre à jour les animations pour tous les ennemis
-    enemies.forEach(e => {
-        if (checkCollision(getHitbox(player), getHitbox(e))) {
-            const damageCooldown = 1000;
-            if (now - e.lastDamageTime > damageCooldown) {
-                takeDamage(e.damage);
-                e.lastDamageTime = now;
-            }
-        }
-        e.anim.timer++;
-        if (e.anim.timer > e.anim.speed) {
-            e.anim.timer = 0;
-            e.anim.frame = (e.anim.frame + 1) % e.frameCount;
-        }
-    });
 }
 
 
@@ -472,6 +497,8 @@ function killEnemy(enemy){
         xpGems.push({
             x:enemy.x+enemy.w/2,
             y:enemy.y+enemy.h/2,
+            w: 32,
+            h: 32,
             value:enemy.xp,
             anim: { frame: 0, timer: 0, speed: gemInfo.animSpeed },
             frameCount: gemInfo.frameCount,
@@ -494,6 +521,8 @@ function killEnemy(enemy){
         goldCoins.push({
             x: enemy.x + enemy.w / 2,
             y: enemy.y + enemy.h / 2,
+            w: 32,
+            h: 32,
             value: 1,
             anim: { frame: 0, timer: 0, speed: goldInfo.animSpeed },
             frameCount: goldInfo.frameCount,
@@ -570,7 +599,7 @@ function updateGoldCoins() {
 }
 
 // Collecte de l'XP et vérifie si le joueur monte de niveau
-function collectXP(amount){player.xp+=amount;if(player.xp>=player.xpToNextLevel){levelUp();}}
+function collectXP(amount){player.xp += amount * player.xpMultiplier;if(player.xp>=player.xpToNextLevel){levelUp();}}
 
 // Gère la montée de niveau du joueur
 function levelUp(){
@@ -578,7 +607,6 @@ function levelUp(){
     player.level++;
     player.xp-=player.xpToNextLevel;
     player.xpToNextLevel=Math.floor(player.xpToNextLevel*1.5);
-    // player.health=player.maxHealth; // La guérison a été supprimée comme demandé précédemment
     levelUpModal.style.display='flex';
     populateUpgradeOptions();
 }
@@ -590,7 +618,7 @@ function populateUpgradeOptions(){
     while(c.length<3&&a.length>0){
         const r=Math.floor(Math.random()*a.length);
         const o=a[r];
-        const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay')?player.weapons[o.id]?.level||0:-1;
+        const wL=(o.id==='magicMissile'||o.id==='aura'||o.id==='auraOfDecay'||o.id==='boomerang')?player.weapons[o.id]?.level||0:-1;
         const d=document.createElement('div');
         d.className='upgrade-option';
         d.innerHTML=`<div class="upgrade-icon">${o.icon}</div><div><strong>${o.name}</strong><br><small>${o.description(wL)}</small></div>`;
@@ -665,14 +693,17 @@ async function gameVictory() {
     backgroundMusic.currentTime = 0;
 }
 
-// Fonction pour vérifier si un ennemi est visible à l'écran
-function isEnemyVisible(enemy) {
-    const enemyScreenX = enemy.x - camera.x;
-    const enemyScreenY = enemy.y - camera.y;
-    return enemyScreenX < canvas.width &&
-           enemyScreenX + enemy.spriteW > 0 &&
-           enemyScreenY < canvas.height &&
-           enemyScreenY + enemy.spriteH > 0;
+// Fonction pour vérifier si une entité est visible à l'écran
+function isEntityOnScreen(entity) {
+    const entityScreenX = entity.x - camera.x;
+    const entityScreenY = entity.y - camera.y;
+    const width = entity.spriteW || entity.w;
+    const height = entity.spriteH || entity.h;
+    
+    return entityScreenX + width > -CULLING_BUFFER &&
+           entityScreenX < canvas.width + CULLING_BUFFER &&
+           entityScreenY + height > -CULLING_BUFFER &&
+           entityScreenY < canvas.height + CULLING_BUFFER;
 }
 
 // Trouve l'ennemi le plus proche du joueur qui est visible et à portée de missile
@@ -683,7 +714,7 @@ function findNearestEnemy(){
 
     enemies.forEach(e=>{
         const distanceToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
-        if (isEnemyVisible(e) && distanceToPlayer <= missileRange) {
+        if (isEntityOnScreen(e) && distanceToPlayer <= missileRange) {
             if(distanceToPlayer < minDistance){
                 minDistance = distanceToPlayer;
                 nearest = e;
@@ -703,7 +734,20 @@ function formatTime(milliseconds) {
 }
 
 // Met à jour les icônes de statut
+let lastWeaponLevels = {};
+let lastPassiveLevels = {};
 function updateStatusIcons() {
+    const currentWeaponLevels = JSON.stringify(player.weapons);
+    const currentPassiveLevels = JSON.stringify(player.passiveLevels);
+
+    // Ne met à jour le DOM que si les niveaux ont changé
+    if (currentWeaponLevels === lastWeaponLevels && currentPassiveLevels === lastPassiveLevels) {
+        return;
+    }
+
+    lastWeaponLevels = currentWeaponLevels;
+    lastPassiveLevels = currentPassiveLevels;
+
     weaponIconsUI.innerHTML = '';
     passiveIconsUI.innerHTML = '';
     const tooltip = document.getElementById('tooltip');
@@ -805,6 +849,47 @@ function updateWeapons(){
             });
         }
     }
+    const boomerang = player.weapons.boomerang;
+    if (boomerang.level > 0 && now - boomerang.lastShot > boomerang.cooldown) {
+        boomerang.lastShot = now;
+        const speed = 6;
+        const target = findNearestEnemy(); // Find a target
+
+        for (let i = 0; i < boomerang.level; i++) {
+            let angle;
+            if (target) {
+                // Aim at the nearest enemy
+                const dx = target.x - player.x;
+                const dy = target.y - player.y;
+                angle = Math.atan2(dy, dx);
+            } else {
+                // Default behavior if no enemy is in range: launch forward
+                angle = (player.anim.facingRight ? 0 : Math.PI);
+            }
+            
+            // Add a slight offset for multiple boomerangs so they don't overlap perfectly
+            angle += (i * (Math.PI / 16) - (Math.PI / 32));
+
+            const pDef = projectileDefinitions.boomerang;
+            projectiles.push({
+                x: player.x + player.w / 2,
+                y: player.y + player.h / 2,
+                startX: player.x,
+                startY: player.y,
+                w: pDef.drawW,
+                h: pDef.drawH,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                damage: boomerang.damage * player.damageMultiplier,
+                range: 300 * player.aoeMultiplier,
+                isReturning: false,
+                angle: 0,
+                rotationSpeed: pDef.rotationSpeed,
+                type: 'boomerang',
+                piercedEnemies: []
+            });
+        }
+    }
     const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=24 * player.aoeMultiplier,orbH=24 * player.aoeMultiplier;const effectiveAuraRadius = aura.radius * player.aoeMultiplier;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*effectiveAuraRadius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*effectiveAuraRadius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=(aura.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
     const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;const effectiveAodRadius = aod.radius * player.aoeMultiplier;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<effectiveAodRadius){enemy.currentHealth-=(aod.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
 }
@@ -818,25 +903,56 @@ function updateProjectiles(){
             if (p.trail.length > p.maxTrailLength) {
                 p.trail.pop();
             }
+        } else if (p.type === 'boomerang') {
+            p.angle += p.rotationSpeed;
+            if (!p.isReturning) {
+                const dist = Math.hypot(p.x - p.startX, p.y - p.startY);
+                if (dist > p.range) {
+                    p.isReturning = true;
+                }
+            } else {
+                const returnSpeed = 8;
+                const dx = (player.x + player.w / 2) - p.x;
+                const dy = (player.y + player.h / 2) - p.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 20) {
+                    projectiles.splice(pI, 1);
+                    continue;
+                }
+                p.vx = (dx / dist) * returnSpeed;
+                p.vy = (dy / dist) * returnSpeed;
+            }
         }
+
 
         p.x+=p.vx;
         p.y+=p.vy;
         p.lifespan--;
 
-        if(p.lifespan<=0){
+        if(p.lifespan<=0 && p.type !== 'boomerang'){
             projectiles.splice(pI,1);
             continue;
         }
         for(let i=enemies.length-1;i>=0;i--){
             const e=enemies[i];
             if(checkCollision(p,getHitbox(e))){
-                e.currentHealth-=p.damage;
-                if(e.currentHealth<=0&&!e.isDead){ // CORRECTION ICI: 'enemy' remplacé par 'e'
-                    killEnemy(e);
+                
+                if (p.type !== 'boomerang') {
+                    e.currentHealth-=p.damage;
+                    projectiles.splice(pI, 1);
+                    if(e.currentHealth<=0&&!e.isDead){
+                        killEnemy(e);
+                    }
+                    break; 
+                } else {
+                     if (!p.piercedEnemies.includes(e)) {
+                        e.currentHealth -= p.damage;
+                        p.piercedEnemies.push(e);
+                        if (e.currentHealth <= 0 && !e.isDead) {
+                            killEnemy(e);
+                        }
+                    }
                 }
-                projectiles.splice(pI,1);
-                break;
             }
         }
     }
@@ -923,7 +1039,7 @@ function draw(){
     });
 
     xpGems.forEach(gem => {
-        if(assets.xpGem && assets.xpGem.complete && assets.xpGem.naturalHeight !== 0) {
+        if(isEntityOnScreen(gem) && assets.xpGem && assets.xpGem.complete && assets.xpGem.naturalHeight !== 0) {
             const sprite = assets.xpGem;
             const frameWidth = sprite.naturalWidth / gem.frameCount;
             const frameHeight = sprite.naturalHeight;
@@ -933,7 +1049,7 @@ function draw(){
     });
 
     goldCoins.forEach(coin => {
-        if(assets.gold && assets.gold.complete && assets.gold.naturalHeight !== 0) {
+        if(isEntityOnScreen(coin) && assets.gold && assets.gold.complete && assets.gold.naturalHeight !== 0) {
             const sprite = assets.gold;
             const frameWidth = sprite.naturalWidth / coin.frameCount;
             const frameHeight = sprite.naturalHeight;
@@ -943,22 +1059,24 @@ function draw(){
     });
 
     enemies.forEach(e => {
-        if(assets[e.type]) {
-            const sprite = assets[e.type];
-            if (sprite.complete && sprite.naturalHeight !== 0) {
-                const frameWidth = sprite.naturalWidth / e.frameCount;
-                const frameHeight = sprite.naturalHeight;
-                const sourceX = e.anim.frame * frameWidth;
-                ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, e.x + e.visualOffsetX, e.y + e.visualOffsetY, e.spriteW, e.spriteH);
-                if(debugMode) {
-                    ctx.strokeStyle = 'rgba(255,0,0,0.5)';
-                    ctx.lineWidth = 2;
-                    const hitbox = getHitbox(e);
-                    ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+        if(isEntityOnScreen(e)) {
+            if(assets[e.type]) {
+                const sprite = assets[e.type];
+                if (sprite.complete && sprite.naturalHeight !== 0) {
+                    const frameWidth = sprite.naturalWidth / e.frameCount;
+                    const frameHeight = sprite.naturalHeight;
+                    const sourceX = e.anim.frame * frameWidth;
+                    ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, e.x + e.visualOffsetX, e.y + e.visualOffsetY, e.spriteW, e.spriteH);
+                    if(debugMode) {
+                        ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+                        ctx.lineWidth = 2;
+                        const hitbox = getHitbox(e);
+                        ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+                    }
                 }
             }
+            if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
         }
-        if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
     });
 
     // Dessine le joueur avec une rotation horizontale si nécessaire
@@ -1024,13 +1142,28 @@ function draw(){
         ctx.fill();
     }
     projectiles.forEach(p=>{
-        if (p.type === 'magicMissile') {
-            p.trail.forEach((trailPoint, index) => {
+        if (isEntityOnScreen(p)) {
+            if (p.type === 'magicMissile') {
+                p.trail.forEach((trailPoint, index) => {
+                    ctx.save();
+                    const alpha = p.trailOpacityStart - (index / (p.maxTrailLength - 1)) * (p.trailOpacityStart - p.trailOpacityEnd);
+                    ctx.globalAlpha = Math.max(0, alpha);
+                    ctx.translate(trailPoint.x, trailPoint.y);
+                    ctx.rotate(trailPoint.angle);
+                    ctx.fillStyle = '#00FFFF';
+                    ctx.beginPath();
+                    ctx.moveTo(p.w / 2, 0);
+                    ctx.lineTo(-p.w / 2, -p.h / 2);
+                    ctx.lineTo(-p.w / 2, p.h / 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
+                ctx.globalAlpha = 1.0;
+
                 ctx.save();
-                const alpha = p.trailOpacityStart - (index / (p.maxTrailLength - 1)) * (p.trailOpacityStart - p.trailOpacityEnd);
-                ctx.globalAlpha = Math.max(0, alpha);
-                ctx.translate(trailPoint.x, trailPoint.y);
-                ctx.rotate(trailPoint.angle);
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
                 ctx.fillStyle = '#00FFFF';
                 ctx.beginPath();
                 ctx.moveTo(p.w / 2, 0);
@@ -1039,25 +1172,31 @@ function draw(){
                 ctx.closePath();
                 ctx.fill();
                 ctx.restore();
-            });
-            ctx.globalAlpha = 1.0;
-
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.angle);
-            ctx.fillStyle = '#00FFFF';
-            ctx.beginPath();
-            ctx.moveTo(p.w / 2, 0);
-            ctx.lineTo(-p.w / 2, -p.h / 2);
-            ctx.lineTo(-p.w / 2, p.h / 2);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-        }
-        if(debugMode) {
-            ctx.strokeStyle = 'rgba(255,255,0,0.8)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h);
+            } else if (p.type === 'boomerang') {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.fillStyle = '#A0522D'; // Brown color for wood
+                ctx.strokeStyle = '#8B4513'; // Lighter brown for border
+                ctx.lineWidth = 3;
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-p.w / 2, -p.h / 2);
+                ctx.lineTo(-p.w / 2 + 10, -p.h / 2 + 5);
+                ctx.lineTo(0, 10);
+                ctx.lineTo(p.w / 2 - 10, -p.h / 2 + 5);
+                ctx.lineTo(p.w / 2, -p.h / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+            if(debugMode) {
+                ctx.strokeStyle = 'rgba(255,255,0,0.8)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h);
+            }
         }
     });
 
@@ -1102,6 +1241,7 @@ function gameLoop(timestamp){
         updatePlayerRegeneration(deltaTime);
         updatePlayerInvincibility();
         gameState.gameTime+=deltaTime;
+        updateStatusIcons();
 
         const thirtyMinutesInMs = 30 * 60 * 1000;
         if (gameState.gameTime >= thirtyMinutesInMs) {
@@ -1237,7 +1377,8 @@ function populatePauseStats() {
         auraOfDecay: "Aura Néfaste",
         maxHealth: "Coeur robuste",
         speed: "Bottes de vitesse",
-        regeneration: "Régénération"
+        regeneration: "Régénération",
+        boomerang: "Boomerang"
     };
 
     for (const upgradeId in currentUpgrades) {
@@ -1338,7 +1479,7 @@ function updateMainMenuGoldDisplay() {
 // Fonctions pour le menu des améliorations permanentes
 function getUpgradeCost(upgrade) {
     if (upgrade.level >= upgrade.maxLevel) return Infinity;
-    return upgrade.initialCost * Math.pow(2, upgrade.level);
+    return Math.floor(upgrade.initialCost * Math.pow(1.2, upgrade.level));
 }
 
 function showUpgradesMenu() {
@@ -1424,7 +1565,7 @@ function resetAllUpgrades() {
         const upgrade = permanentUpgrades[key];
         if (upgrade.level > 0) {
              for(let i = 0; i < upgrade.level; i++) {
-                totalRefund += upgrade.initialCost * Math.pow(2, i);
+                totalRefund += Math.floor(upgrade.initialCost * Math.pow(1.2, i));
              }
         }
         upgrade.level = 0;
