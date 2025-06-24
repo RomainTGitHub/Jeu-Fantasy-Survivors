@@ -21,12 +21,30 @@ let sfxVolumeSlider;
 let optionsBackButton;
 let returnToMenuAfterOptions = ''; // Pour savoir à quel menu retourner ('main' ou 'pause')
 
+// Éléments du menu des améliorations permanentes
+let permanentUpgradesMenu;
+let upgradesGrid;
+let upgradesBackButton;
+let upgradesMenuGoldUI;
+
 // Variable pour suivre l'état de la musique et le volume
 let isMusicOn = true; // Suppose que la musique est activée par défaut
 let musicVolume = 1; // Volume de la musique par défaut (1 = 100%)
 let areSoundEffectsOn = true; // Suppose que les effets sonores sont activés par défaut
 let sfxVolume = 1; // Volume des effets sonores par défaut (1 = 100%)
 
+// --- Améliorations permanentes ---
+let permanentUpgrades = {
+    maxHealth: { level: 0, cost: 500, maxLevel: 10 } // Le coût est désormais fixe
+};
+
+const permanentUpgradeDefinitions = {
+    maxHealth: {
+        emoji: '❤️',
+        title: 'PV Max',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    }
+};
 
 // --- Chargement des ressources ---
 const assets = {};
@@ -110,7 +128,7 @@ let enemySpawnTimer = 0;
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 1.5, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -128,9 +146,15 @@ let player; // Changé de const à let
 
 // Fonction pour réinitialiser l'état du joueur aux valeurs initiales
 function resetPlayerState() {
-    // Copie profonde de initialPlayerState pour s'assurer que tous les objets imbriqués sont également réinitialisés
+    const currentGold = player ? player.gold : 0;
     player = JSON.parse(JSON.stringify(initialPlayerState));
-    // L'or doit être géré séparément car il est persistant, chargé par loadPlayerGold()
+    player.gold = currentGold;
+
+    // Appliquer les améliorations permanentes
+    const baseHealth = 120;
+    const healthPerLevel = 50;
+    player.maxHealth = baseHealth + (permanentUpgrades.maxHealth.level * healthPerLevel);
+    player.health = player.maxHealth;
 }
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
@@ -177,7 +201,7 @@ const availableUpgrades=[
     {
         id:'regeneration',
         name:'Régénération',
-        description:()=>`Régénère passivement la vie. (+1 PV/sec)`, // Description de l'amélioration
+        description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description de l'amélioration
         apply:()=>{player.regenerationRate+=1;}
     }
 ];
@@ -553,7 +577,7 @@ async function gameOver(){
     gameState.running=false;
     finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;
     gameOverModal.style.display='flex';
-    savePlayerGold();
+    saveGameData();
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
@@ -566,7 +590,7 @@ async function gameOver(){
 async function gameVictory() {
     gameState.running = false;
     victoryModal.style.display = 'flex';
-    savePlayerGold();
+    saveGameData();
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
@@ -690,7 +714,7 @@ function updateProjectiles(){
             const e=enemies[i];
             if(checkCollision(p,getHitbox(e))){
                 e.currentHealth-=p.damage;
-                if(e.currentHealth<=0&&!e.isDead){
+                if(e.currentHealth<=0&&!e.isDead){ // CORRECTION ICI: 'enemy' remplacé par 'e'
                     killEnemy(e);
                 }
                 projectiles.splice(pI,1);
@@ -982,6 +1006,9 @@ function startGame() {
         animationFrameId = null;
     }
 
+    resetPlayerState(); // Réinitialise le joueur avant de commencer
+    loadGameData();     // Charge les données pour appliquer l'or etc.
+
     gameState.gameStarted = true;
     gameState.running = true;
     gameState.paused = false;
@@ -1014,9 +1041,7 @@ function resumeGame() {
 
 // Fonction pour quitter le jeu et retourner au menu principal
 function quitGame() {
-    savePlayerGold();
-    resetPlayerState();
-    loadPlayerGold();
+    saveGameData();
 
     enemies = [];
     projectiles = [];
@@ -1034,6 +1059,8 @@ function quitGame() {
     mainMenu.style.display = 'flex';
     mainMenuGoldUI.style.display = 'block';
     soundControlsUI.style.display = 'flex';
+    
+    loadGameData(); // Recharge les données pour mettre à jour l'affichage de l'or
     updateMainMenuGoldDisplay();
 
     if (animationFrameId) {
@@ -1056,15 +1083,20 @@ function populatePauseStats() {
             currentUpgrades[weaponId] = player.weapons[weaponId].level;
         }
     }
+    
+    // Calcule les PV max de base (avec améliorations permanentes)
+    const baseHealthWithUpgrades = 120 + (permanentUpgrades.maxHealth.level * 50);
 
-    if (player.maxHealth > initialPlayerState.maxHealth) {
-        currentUpgrades.maxHealth = (player.maxHealth - initialPlayerState.maxHealth) / 20;
+    // Ne montre que les améliorations de PV max temporaires (en jeu)
+    if (player.maxHealth > baseHealthWithUpgrades) {
+        currentUpgrades.maxHealth = (player.maxHealth - baseHealthWithUpgrades) / 20;
     }
+
     if (player.speed > initialPlayerState.speed) {
         currentUpgrades.speed = (player.speed - initialPlayerState.speed) / 0.5;
     }
     if (player.regenerationRate > initialPlayerState.regenerationRate) {
-        currentUpgrades.regeneration = (player.regenerationRate - initialPlayerState.regenerationRate) / 0.5;
+        currentUpgrades.regeneration = player.regenerationRate;
     }
 
     const upgradeDisplayNames = {
@@ -1084,7 +1116,7 @@ function populatePauseStats() {
         if (upgradeId === 'regeneration') {
             li.textContent = `${displayName}: +${player.regenerationRate.toFixed(1)} PV/sec`;
         } else if (upgradeId === 'maxHealth') {
-            li.textContent = `${displayName}: +${player.maxHealth - initialPlayerState.maxHealth} Vie Max`;
+             li.textContent = `${displayName}: +${level * 20} Vie Max`;
         } else if (upgradeId === 'speed') {
             li.textContent = `${displayName}: +${(player.speed - initialPlayerState.speed).toFixed(1)} Vitesse`;
         } else {
@@ -1094,15 +1126,23 @@ function populatePauseStats() {
     }
 }
 
-// Fonction pour charger l'or du joueur depuis localStorage
-function loadPlayerGold() {
+// Fonction pour charger les données du joueur depuis localStorage
+function loadGameData() {
     try {
+        const storedUpgrades = localStorage.getItem('permanentUpgrades');
+        if (storedUpgrades) {
+            permanentUpgrades = JSON.parse(storedUpgrades);
+        }
+
+        // Crée l'objet player et applique les stats de base + améliorations permanentes
+        resetPlayerState();
+
+        // Charge l'or et l'applique au joueur
         const storedGold = localStorage.getItem('playerGold');
         if (storedGold !== null) {
             player.gold = parseInt(storedGold, 10);
-        } else {
-            player.gold = 0;
         }
+
         updateMainMenuGoldDisplay();
 
         const savedMusicVolume = localStorage.getItem('musicVolume');
@@ -1128,14 +1168,17 @@ function loadPlayerGold() {
 
     } catch (error) {
         console.error("Erreur lors du chargement depuis localStorage :", error);
+        // En cas d'erreur, on s'assure que le joueur est dans un état de base fonctionnel
+        resetPlayerState();
         player.gold = 0;
     }
 }
 
-// Fonction pour sauvegarder l'or et les paramètres audio du joueur dans localStorage
-function savePlayerGold() {
+// Fonction pour sauvegarder les données du joueur dans localStorage
+function saveGameData() {
     try {
         localStorage.setItem('playerGold', player.gold.toString());
+        localStorage.setItem('permanentUpgrades', JSON.stringify(permanentUpgrades));
         localStorage.setItem('musicVolume', musicVolume.toString());
         localStorage.setItem('sfxVolume', sfxVolume.toString());
         localStorage.setItem('isMusicOn', isMusicOn.toString());
@@ -1145,12 +1188,87 @@ function savePlayerGold() {
     }
 }
 
-// Fonction pour mettre à jour l'affichage de l'or dans le menu principal
+// Fonction pour mettre à jour l'affichage de l'or
 function updateMainMenuGoldDisplay() {
-    if (mainMenuGoldUI) {
+    if (player && mainMenuGoldUI) {
         mainMenuGoldUI.textContent = `Or: ${player.gold}`;
     }
+    if (player && upgradesMenuGoldUI) {
+        upgradesMenuGoldUI.textContent = `Or: ${player.gold}`;
+    }
 }
+
+// Fonctions pour le menu des améliorations permanentes
+function showUpgradesMenu() {
+    mainMenu.style.display = 'none';
+    permanentUpgradesMenu.style.display = 'flex';
+    updateMainMenuGoldDisplay();
+    setupPermanentUpgrades();
+}
+
+function hideUpgradesMenu() {
+    mainMenu.style.display = 'flex';
+    permanentUpgradesMenu.style.display = 'none';
+}
+
+function setupPermanentUpgrades() {
+    upgradesGrid.innerHTML = '';
+    for (const key in permanentUpgrades) {
+        const btn = document.createElement('button');
+        btn.className = 'permanent-upgrade-btn';
+        btn.dataset.upgradeKey = key;
+
+        updateUpgradeButton(btn, key);
+
+        btn.addEventListener('click', () => {
+            buyPermanentUpgrade(key);
+        });
+        upgradesGrid.appendChild(btn);
+    }
+}
+
+function buyPermanentUpgrade(key) {
+    const upgrade = permanentUpgrades[key];
+    if (player.gold >= upgrade.cost && upgrade.level < upgrade.maxLevel) {
+        player.gold -= upgrade.cost;
+        upgrade.level++;
+        // La ligne qui augmente le coût est supprimée pour garder un prix fixe
+        
+        saveGameData();
+        updateMainMenuGoldDisplay();
+        
+        const btn = upgradesGrid.querySelector(`[data-upgrade-key="${key}"]`);
+        updateUpgradeButton(btn, key);
+    }
+}
+
+function updateUpgradeButton(btn, key) {
+    const upgrade = permanentUpgrades[key];
+    const def = permanentUpgradeDefinitions[key];
+    
+    let costText = "MAX";
+    if (upgrade.level < upgrade.maxLevel) {
+        costText = `Coût: ${upgrade.cost} or`;
+    }
+
+    // Le bouton est un conteneur flex avec direction: column et justify-content: space-between.
+    // Cette structure poussera le coût vers le bas.
+    btn.innerHTML = `
+        <div>
+            <div style="font-size: 24px;">${def.emoji}</div>
+            <div>${def.title}</div>
+            <div>${def.description(upgrade.level, upgrade.maxLevel)}</div>
+        </div>
+        <div class="upgrade-cost">${costText}</div>
+    `;
+
+    if (upgrade.level >= upgrade.maxLevel || player.gold < upgrade.cost) {
+        btn.disabled = true;
+    } else {
+        btn.disabled = false;
+    }
+}
+
 
 // Fonction pour afficher une alerte de lecture automatique personnalisée
 function showCustomAutoplayAlert() {
@@ -1185,14 +1303,14 @@ function toggleMusic() {
         backgroundMusic.volume = 0;
     }
     toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
-    savePlayerGold();
+    saveGameData();
 }
 
 // Fonction pour basculer les effets sonores
 function toggleSoundEffects() {
     areSoundEffectsOn = !areSoundEffectsOn;
     toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
-    savePlayerGold();
+    saveGameData();
 }
 
 // Fonctions pour afficher/cacher le modal d'options
@@ -1217,7 +1335,7 @@ function hideOptions() {
     } else if (returnToMenuAfterOptions === 'pause') {
         pauseModal.style.display = 'flex';
     }
-    savePlayerGold();
+    saveGameData();
 }
 
 // Fonctions pour mettre à jour le volume à partir des curseurs
@@ -1226,14 +1344,14 @@ function updateMusicVolume() {
     backgroundMusic.volume = musicVolume;
     isMusicOn = musicVolume > 0;
     toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
-    savePlayerGold();
+    saveGameData();
 }
 
 function updateSfxVolume() {
     sfxVolume = parseFloat(sfxVolumeSlider.value);
     areSoundEffectsOn = sfxVolume > 0;
     toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
-    savePlayerGold();
+    saveGameData();
 }
 
 // Fonction d'initialisation du jeu
@@ -1257,8 +1375,6 @@ function init(){
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
-
-    resetPlayerState();
 
     levelUI=document.getElementById('level');
     timerUI=document.getElementById('timer');
@@ -1287,6 +1403,11 @@ function init(){
     musicVolumeSlider = document.getElementById('music-volume-slider');
     sfxVolumeSlider = document.getElementById('sfx-volume-slider');
     optionsBackButton = document.getElementById('optionsBackButton');
+
+    permanentUpgradesMenu = document.getElementById('permanent-upgrades-menu');
+    upgradesGrid = document.getElementById('upgrades-grid');
+    upgradesBackButton = document.getElementById('upgradesBackButton');
+    upgradesMenuGoldUI = document.getElementById('upgrades-menu-gold');
     
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
@@ -1296,7 +1417,7 @@ function init(){
         if (assets.background.complete && assets.background.naturalWidth !== 0) {
              backgroundPattern = ctx.createPattern(assets.background, 'repeat');
         }
-        loadPlayerGold();
+        loadGameData();
         draw(); // Dessine l'état initial
     });
 }
@@ -1307,11 +1428,11 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     document.getElementById('startGameButton').addEventListener('click', startGame);
-    document.getElementById('upgradesMenuButton').addEventListener('click', () => {
-        console.log("Le bouton 'Améliorations' a été cliqué.");
-    });
+    document.getElementById('upgradesMenuButton').addEventListener('click', showUpgradesMenu);
     document.getElementById('optionsMenuButton').addEventListener('click', showOptionsFromMain);
-    document.getElementById('optionsBackButton').addEventListener('click', hideOptions);
+    
+    upgradesBackButton.addEventListener('click', hideUpgradesMenu);
+    optionsBackButton.addEventListener('click', hideOptions);
 
     musicVolumeSlider.addEventListener('input', updateMusicVolume);
     sfxVolumeSlider.addEventListener('input', updateSfxVolume);
