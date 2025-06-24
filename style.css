@@ -1,0 +1,307 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #1a1a1a;
+    color: #fff;
+    font-family: 'Press Start 2P', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    border: 4px solid #5a3d2b;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    background-color: #000;
+    width: clamp(320px, 90vw, 1400px);
+    height: clamp(240px, 85vh, 900px);
+    overflow: hidden;
+    /* Assurez-vous que le contenu ne déborde pas */
+    transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out;
+    /* Transition douce pour le retour de dégâts */
+}
+
+/* Nouveau CSS pour le retour de dégâts */
+#game-container.damage-overlay {
+    border-color: #ff0000;
+    /* Bordure rouge lors des dégâts */
+    box-shadow: 0 0 25px 10px rgba(255, 0, 0, 0.7);
+    /* Effet de lueur rouge */
+}
+
+canvas {
+    display: block;
+    background-color: #333;
+    /* Secours */
+    width: 100%;
+    height: 100%;
+}
+
+#ui-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    pointer-events: none;
+}
+
+#stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    color: #fff;
+    text-shadow: 2px 2px 2px #000;
+}
+
+#health-bar-container,
+#xp-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 2px solid #fff;
+    border-radius: 5px;
+    margin-top: 10px;
+    overflow: hidden;
+    position: relative;
+    /* Ajouté pour le positionnement absolu de bar-text */
+}
+
+#health-bar {
+    height: 100%;
+}
+
+#xp-bar {
+    height: 100%;
+    transition: width 0.2s ease-in-out;
+}
+
+#health-bar {
+    background-color: #c0392b;
+}
+
+#xp-bar {
+    background-color: #2980b9;
+}
+
+/* Styles pour le texte sur les barres */
+.bar-text {
+    position: absolute;
+    top: 0;
+    /* Position explicite en haut */
+    left: 0;
+    /* Position explicite à gauche */
+    width: 100%;
+    height: 100%;
+    /* Prend toute la hauteur du parent */
+    display: flex;
+    /* Utilise flexbox pour le centrage */
+    align-items: center;
+    /* Centre verticalement */
+    justify-content: center;
+    /* Centre horizontalement */
+    font-size: 14px;
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
+    pointer-events: none;
+    /* S'assure qu'il ne bloque pas les clics */
+    z-index: 1;
+    /* S'assure qu'il est au-dessus de la barre mais sous les autres UI */
+}
+
+/* Style pour l'affichage de l'or */
+#gold-display {
+    position: absolute;
+    top: 100px;
+    bottom: 5px;
+    right: 5px;
+    font-size: 16px;
+    color: #f1c40f;
+    text-shadow: 2px 2px #000;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 10;
+}
+
+.modal h2 {
+    font-size: 24px;
+    color: #f1c40f;
+    margin-bottom: 20px;
+}
+
+.modal-content {
+    background-color: #2c2c2c;
+    padding: 30px;
+    border: 4px solid #5a3d2b;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 500px;
+}
+
+.upgrade-option {
+    background-color: #4a4a4a;
+    border: 2px solid #eee;
+    padding: 15px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-radius: 5px;
+}
+
+.upgrade-option:hover {
+    background-color: #f1c40f;
+    color: #1a1a1a;
+}
+
+#game-over-modal button,
+#main-menu button,
+#pause-modal button,
+#victory-modal button,
+#options-modal button {
+    /* Ajout des boutons de modal */
+    font-family: 'Press Start 2P', cursive;
+    font-size: 16px;
+    padding: 15px 30px;
+    background-color: #f1c40f;
+    color: #1a1a1a;
+    border: none;
+    cursor: pointer;
+    margin-top: 20px;
+    border-radius: 5px;
+}
+
+/* Styles du menu principal */
+#main-menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 20;
+    /* Assurez-vous qu'il est au-dessus de tout le reste */
+}
+
+#main-menu h1 {
+    font-size: 48px;
+    color: #f1c40f;
+    margin-bottom: 40px;
+    text-shadow: 4px 4px 0px #e67e22;
+}
+
+/* Marge supérieure ajustée pour les boutons du menu principal */
+#main-menu button {
+    margin-top: 15px;
+    /* Marge plus petite entre les boutons */
+    margin-bottom: 5px;
+    /* Ajoute de l'espace sous chaque bouton */
+}
+
+#main-menu-gold {
+    /* Style pour l'affichage de l'or dans le menu principal */
+    font-size: 20px;
+    color: #f1c40f;
+    text-shadow: 2px 2px 2px #000;
+    margin-top: 20px;
+}
+
+/* Styles pour les contrôles du son */
+#sound-controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 30;
+    /* S'assure qu'il est au-dessus de tout */
+    display: none;
+    /* Caché par défaut, affiché uniquement dans le menu principal */
+    flex-direction: column;
+    /* Empile les boutons verticalement */
+    gap: 10px;
+    /* Espace entre les boutons */
+}
+
+#sound-controls button {
+    background-color: #f1c40f;
+    color: #1a1a1a;
+    border: none;
+    padding: 10px 15px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+/* Styles pour les curseurs de volume dans le modal d'options */
+.volume-control {
+    margin: 15px 0;
+    text-align: left;
+    width: 100%;
+}
+
+.volume-control label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #fff;
+}
+
+.volume-control input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    /* Remplace les styles CSS par défaut */
+    appearance: none;
+    height: 10px;
+    background: #d3d3d3;
+    /* Fond gris */
+    outline: none;
+    /* Supprime le contour */
+    opacity: 0.7;
+    /* Définit la transparence (pour la piste du curseur) */
+    -webkit-transition: .2s;
+    /* Transition de 0,2 seconde au survol */
+    transition: opacity .2s;
+    border-radius: 5px;
+}
+
+/* Pouce du curseur */
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #f1c40f;
+    /* Couleur jaune */
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid #1a1a1a;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #f1c40f;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid #1a1a1a;
+}
