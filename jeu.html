@@ -22,6 +22,7 @@
             <h1>Fantasy Survivors</h1>
             <button id="startGameButton">Jouer !</button>
             <button id="upgradesMenuButton">Améliorations</button>
+            <button id="statsMenuButton">Stats</button>
             <button id="optionsMenuButton">Options</button>
             <p id="main-menu-gold">Or: 0</p>
         </div>
@@ -38,6 +39,21 @@
                 <button id="upgradesBackButton">Retour</button>
             </div>
         </div>
+
+        <!-- Menu des statistiques -->
+        <div id="stats-menu" class="modal">
+            <div class="modal-content">
+                <h2>Statistiques</h2>
+                <div id="stats-container">
+                    <h3>Personnage</h3>
+                    <div id="character-stats-grid" class="stats-grid"></div>
+                    <h3>Globales</h3>
+                    <div id="global-stats-grid" class="stats-grid"></div>
+                </div>
+                <button id="statsBackButton">Retour</button>
+            </div>
+        </div>
+
 
         <!-- Modal de confirmation de réinitialisation -->
         <div id="reset-confirmation-modal" class="modal">

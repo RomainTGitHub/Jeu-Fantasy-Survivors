@@ -29,6 +29,12 @@ let upgradesMenuGoldUI;
 let resetUpgradesButton;
 let resetConfirmationModal;
 
+// Éléments du menu des statistiques
+let statsMenu;
+let statsBackButton;
+let characterStatsGrid;
+let globalStatsGrid;
+
 // Animation du menu
 let menuBackgroundCanvas, menuBgCtx;
 let menuEntities = [];
@@ -43,6 +49,15 @@ let sfxVolume = 1; // Volume des effets sonores par défaut (1 = 100%)
 // --- Constantes d'optimisation ---
 const MAX_ENEMIES = 150; // Limite le nombre maximum d'ennemis à l'écran
 const CULLING_BUFFER = 200; // Marge autour de l'écran pour le traitement des entités
+
+// --- Statistiques persistantes ---
+let persistentStats = {
+    totalKills: 0,
+    totalXpGained: 0,
+    totalGoldGained: 0,
+    totalLevelsGained: 0,
+    totalPlaytime: 0 // en millisecondes
+};
 
 // --- Améliorations permanentes ---
 let permanentUpgrades = {
@@ -492,6 +507,7 @@ function updateEnemies() {
 function killEnemy(enemy){
     enemy.isDead=true;
     gameState.killCount++;
+    persistentStats.totalKills++;
     if(Math.random()<0.8){
         const gemInfo = itemDefinitions.xpGem;
         xpGems.push({
@@ -593,18 +609,25 @@ function updateGoldCoins() {
 
         if (d < player.w / 2) {
             player.gold += coin.value;
+            persistentStats.totalGoldGained += coin.value;
             goldCoins.splice(i, 1);
         }
     }
 }
 
 // Collecte de l'XP et vérifie si le joueur monte de niveau
-function collectXP(amount){player.xp += amount * player.xpMultiplier;if(player.xp>=player.xpToNextLevel){levelUp();}}
+function collectXP(amount){
+    const realAmount = amount * player.xpMultiplier;
+    player.xp += realAmount;
+    persistentStats.totalXpGained += realAmount;
+    if(player.xp>=player.xpToNextLevel){levelUp();}
+}
 
 // Gère la montée de niveau du joueur
 function levelUp(){
     gameState.paused=true;
     player.level++;
+    persistentStats.totalLevelsGained++;
     player.xp-=player.xpToNextLevel;
     player.xpToNextLevel=Math.floor(player.xpToNextLevel*1.5);
     levelUpModal.style.display='flex';
@@ -726,11 +749,12 @@ function findNearestEnemy(){
 // Formate le temps au format MM:SS:ms
 function formatTime(milliseconds) {
     const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-    const ms = Math.floor((milliseconds % 1000) / 10);
+
     const pad = (num) => String(num).padStart(2, '0');
-    return `${pad(minutes)}:${pad(seconds)}:${pad(ms)}`;
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
 // Met à jour les icônes de statut
@@ -1231,6 +1255,7 @@ function gameLoop(timestamp){
     lastTime=timestamp;
 
     if(!gameState.paused && !debugGalleryMode){
+        persistentStats.totalPlaytime += deltaTime;
         updatePlayer();
         spawnEnemies();
         updateEnemies();
@@ -1241,7 +1266,6 @@ function gameLoop(timestamp){
         updatePlayerRegeneration(deltaTime);
         updatePlayerInvincibility();
         gameState.gameTime+=deltaTime;
-        updateStatusIcons();
 
         const thirtyMinutesInMs = 30 * 60 * 1000;
         if (gameState.gameTime >= thirtyMinutesInMs) {
@@ -1414,6 +1438,11 @@ function loadGameData() {
                 }
             }
         }
+        
+        const storedStats = localStorage.getItem('persistentStats');
+        if (storedStats) {
+            persistentStats = JSON.parse(storedStats);
+        }
 
         resetPlayerState();
 
@@ -1457,6 +1486,7 @@ function saveGameData() {
     try {
         localStorage.setItem('playerGold', player.gold.toString());
         localStorage.setItem('permanentUpgrades', JSON.stringify(permanentUpgrades));
+        localStorage.setItem('persistentStats', JSON.stringify(persistentStats));
         localStorage.setItem('musicVolume', musicVolume.toString());
         localStorage.setItem('sfxVolume', sfxVolume.toString());
         localStorage.setItem('isMusicOn', isMusicOn.toString());
@@ -1578,6 +1608,76 @@ function resetAllUpgrades() {
     setupPermanentUpgrades();
     resetConfirmationModal.style.display = 'none';
 }
+
+
+// Fonctions pour le menu des statistiques
+function showStatsMenu() {
+    mainMenu.style.display = 'none';
+    if(menuAnimationId) {
+        cancelAnimationFrame(menuAnimationId);
+        menuAnimationId = null;
+    }
+    statsMenu.style.display = 'flex';
+    populateStatsMenu();
+}
+
+function hideStatsMenu() {
+    mainMenu.style.display = 'flex';
+    statsMenu.style.display = 'none';
+    if (!menuAnimationId) {
+        menuAnimationLoop();
+    }
+}
+
+function formatPlaytime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function populateStatsMenu() {
+    characterStatsGrid.innerHTML = '';
+    globalStatsGrid.innerHTML = '';
+
+    // Caractéristiques actuelles
+    const charStats = {
+        'PV Max': player.maxHealth,
+        'Vitesse': player.speed.toFixed(2),
+        'Régénération': `${player.regenerationRate.toFixed(2)}/s`,
+        'Dégâts': `+${((player.damageMultiplier - 1) * 100).toFixed(0)}%`,
+        'Zone d\'effet': `+${((player.aoeMultiplier - 1) * 100).toFixed(0)}%`,
+        'Aimant': `+${((player.magnetRadius / initialPlayerState.magnetRadius - 1) * 100).toFixed(0)}%`,
+        'Gain d\'XP': `+${((player.xpMultiplier - 1) * 100).toFixed(0)}%`,
+    };
+
+    for(const [label, value] of Object.entries(charStats)) {
+        const statEntry = document.createElement('div');
+        statEntry.className = 'stat-entry';
+        statEntry.innerHTML = `<span class="stat-label">${label}:</span> <span class="stat-value">${value}</span>`;
+        characterStatsGrid.appendChild(statEntry);
+    }
+    
+    // Statistiques globales
+    const globalStats = {
+        'Ennemis tués': persistentStats.totalKills,
+        'Or total collecté': persistentStats.totalGoldGained,
+        'Niveaux gagnés': persistentStats.totalLevelsGained,
+        'XP totale collectée': Math.floor(persistentStats.totalXpGained),
+        'Temps de jeu total': formatPlaytime(persistentStats.totalPlaytime)
+    };
+
+    for(const [label, value] of Object.entries(globalStats)) {
+        const statEntry = document.createElement('div');
+        statEntry.className = 'stat-entry';
+        statEntry.innerHTML = `<span class="stat-label">${label}:</span> <span class="stat-value">${value}</span>`;
+        globalStatsGrid.appendChild(statEntry);
+    }
+}
+
 
 
 // Fonction pour afficher une alerte de lecture automatique personnalisée
@@ -1794,6 +1894,11 @@ function init(){
     resetUpgradesButton = document.getElementById('resetUpgradesButton');
     resetConfirmationModal = document.getElementById('reset-confirmation-modal');
     
+    statsMenu = document.getElementById('stats-menu');
+    statsBackButton = document.getElementById('statsBackButton');
+    characterStatsGrid = document.getElementById('character-stats-grid');
+    globalStatsGrid = document.getElementById('global-stats-grid');
+    
     menuBackgroundCanvas = document.getElementById('menu-background-canvas');
     menuBgCtx = menuBackgroundCanvas.getContext('2d');
     
@@ -1837,9 +1942,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('startGameButton').addEventListener('click', startGame);
     document.getElementById('upgradesMenuButton').addEventListener('click', showUpgradesMenu);
     document.getElementById('optionsMenuButton').addEventListener('click', showOptionsFromMain);
+    document.getElementById('statsMenuButton').addEventListener('click', showStatsMenu);
     
     upgradesBackButton.addEventListener('click', hideUpgradesMenu);
     optionsBackButton.addEventListener('click', hideOptions);
+    statsBackButton.addEventListener('click', hideStatsMenu);
     
     resetUpgradesButton.addEventListener('click', () => {
         resetConfirmationModal.style.display = 'flex';

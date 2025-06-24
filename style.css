@@ -186,7 +186,8 @@ canvas {
 #victory-modal button,
 #options-modal button,
 #permanent-upgrades-menu button,
-#reset-confirmation-modal button {
+#reset-confirmation-modal button,
+#stats-menu button {
     font-family: 'Press Start 2P', cursive;
     font-size: 16px;
     padding: 15px 30px;
@@ -205,7 +206,8 @@ canvas {
 #victory-modal button:not([disabled]):hover,
 #options-modal button:not([disabled]):hover,
 #permanent-upgrades-menu button:not([disabled]):hover,
-#reset-confirmation-modal button:not([disabled]):hover {
+#reset-confirmation-modal button:not([disabled]):hover,
+#stats-menu button:not([disabled]):hover {
     transform: scale(1.05);
     background-color: #f3d058;
 }
@@ -521,4 +523,40 @@ canvas {
     z-index: 100;
     pointer-events: none;
     white-space: nowrap;
+}
+
+/* Styles pour le menu des statistiques */
+#stats-container {
+    text-align: left;
+}
+
+#stats-container h3 {
+    color: #f1c40f;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #5a3d2b;
+    padding-bottom: 5px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.stat-entry {
+    background-color: #1a1a1a;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.stat-label {
+    color: #ccc;
+}
+
+.stat-value {
+    color: #f1c40f;
+    font-weight: bold;
+    float: right;
 }
