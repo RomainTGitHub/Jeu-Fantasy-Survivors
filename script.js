@@ -108,9 +108,9 @@ let enemySpawnTimer = 0;
 
 // Propriétés initiales du joueur à utiliser pour la réinitialisation
 const initialPlayerState = {
-    x: world.width / 2, y: world.height / 2, w: 75, h: 135, spriteW: 128, spriteH: 160, hitboxOffsetX: 0, hitboxOffsetY: 0,
+    x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 4, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1.5, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -135,7 +135,7 @@ function resetPlayerState() {
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
 const enemyDefinitions={
-    goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:1.5,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
+    goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
     skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80, hitboxOffsetX: 12, hitboxOffsetY: 5, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
     slime:{type:'slime',w:40,h:30,spriteW:100,spriteH:80, hitboxOffsetX: 30, hitboxOffsetY: 30, visualOffsetX: 0, visualOffsetY: 0, speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
     orc:{type:'orc',w:50,h:110,spriteW:128,spriteH:160, hitboxOffsetX: 35, hitboxOffsetY: 22, visualOffsetX: 0, visualOffsetY: 0, speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
@@ -177,8 +177,8 @@ const availableUpgrades=[
     {
         id:'regeneration',
         name:'Régénération',
-        description:()=>`Régénère passivement la vie. (+0.5 PV/sec)`, // Description de l'amélioration
-        apply:()=>{player.regenerationRate+=0.5;}
+        description:()=>`Régénère passivement la vie. (+1 PV/sec)`, // Description de l'amélioration
+        apply:()=>{player.regenerationRate+=1;}
     }
 ];
 
@@ -305,23 +305,78 @@ function getEnemyTypeByTime(){
 }
 
 // Met à jour la position et l'animation des ennemis
-function updateEnemies(){
+function updateEnemies() {
     const now = Date.now();
-    enemies.forEach(e=>{
-        const dx=player.x-e.x;
-        const dy=player.y-e.y;
-        const d=Math.sqrt(dx*dx+dy*dy);
-        if(d>1){
-            const mx=(dx/d)*e.speed;
-            const my=(dy/d)*e.speed;
-            const nextPos=getHitbox(e);
-            nextPos.x+=mx;
-            if(!checkCollisionWithObjects(nextPos,obstacles))e.x+=mx;
-            nextPos.x-=mx;
-            nextPos.y+=my;
-            if(!checkCollisionWithObjects(nextPos,obstacles))e.y+=my;
+
+    // 1. Déplacer tous les ennemis vers le joueur
+    enemies.forEach(e => {
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) {
+            const mx = (dx / d) * e.speed;
+            const my = (dy / d) * e.speed;
+
+            const nextPos = getHitbox(e);
+            nextPos.x += mx;
+            if (!checkCollisionWithObjects(nextPos, obstacles)) e.x += mx;
+            nextPos.x -= mx;
+            nextPos.y += my;
+            if (!checkCollisionWithObjects(nextPos, obstacles)) e.y += my;
         }
-        if(checkCollision(getHitbox(player),getHitbox(e))){
+    });
+
+    // 2. Résoudre les collisions ennemi-ennemi (exécuter plusieurs fois pour la stabilité)
+    const resolutionIterations = 3;
+    for (let iter = 0; iter < resolutionIterations; iter++) {
+        for (let i = 0; i < enemies.length; i++) {
+            for (let j = i + 1; j < enemies.length; j++) {
+                const e1 = enemies[i];
+                const e2 = enemies[j];
+                const hitbox1 = getHitbox(e1);
+                const hitbox2 = getHitbox(e2);
+
+                if (checkCollision(hitbox1, hitbox2)) {
+                    // Logique de séparation simple
+                    const dx = e1.x - e2.x;
+                    const dy = e1.y - e2.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    const push = 0.5; // Force de répulsion par itération
+
+                    let moveX = 0;
+                    let moveY = 0;
+
+                    if (d > 0) {
+                        moveX = (dx / d) * push;
+                        moveY = (dy / d) * push;
+                    } else { // S'ils sont exactement superposés, pousser au hasard
+                        moveX = (Math.random() - 0.5) * push;
+                        moveY = (Math.random() - 0.5) * push;
+                    }
+
+                    // Déplacer e1
+                    const nextPos1 = getHitbox(e1);
+                    nextPos1.x += moveX;
+                    if (!checkCollisionWithObjects(nextPos1, obstacles)) e1.x += moveX;
+                    nextPos1.x -= moveX;
+                    nextPos1.y += moveY;
+                    if (!checkCollisionWithObjects(nextPos1, obstacles)) e1.y += moveY;
+
+                    // Déplacer e2
+                    const nextPos2 = getHitbox(e2);
+                    nextPos2.x -= moveX;
+                    if (!checkCollisionWithObjects(nextPos2, obstacles)) e2.x -= moveX;
+                    nextPos2.x += moveX;
+                    nextPos2.y -= moveY;
+                    if (!checkCollisionWithObjects(nextPos2, obstacles)) e2.y -= moveY;
+                }
+            }
+        }
+    }
+
+    // 3. Vérifier les dégâts au joueur et mettre à jour les animations pour tous les ennemis
+    enemies.forEach(e => {
+        if (checkCollision(getHitbox(player), getHitbox(e))) {
             const damageCooldown = 1000;
             if (now - e.lastDamageTime > damageCooldown) {
                 takeDamage(e.damage);
@@ -329,12 +384,13 @@ function updateEnemies(){
             }
         }
         e.anim.timer++;
-        if(e.anim.timer>e.anim.speed){
-            e.anim.timer=0;
-            e.anim.frame=(e.anim.frame+1)%e.frameCount;
+        if (e.anim.timer > e.anim.speed) {
+            e.anim.timer = 0;
+            e.anim.frame = (e.anim.frame + 1) % e.frameCount;
         }
     });
 }
+
 
 // Gère la mort d'un ennemi
 function killEnemy(enemy){
@@ -763,23 +819,46 @@ function draw(){
         if(e.currentHealth < e.health){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w,4);ctx.fillStyle='#c0392b';ctx.fillRect(e.x+e.hitboxOffsetX,e.y+e.hitboxOffsetY-8,e.w*(e.currentHealth/e.health),4);}
     });
 
+    // Dessine le joueur avec une rotation horizontale si nécessaire
     ctx.save();
-    const currentSpriteX = player.x - (player.spriteW - player.w) / 2 + player.hitboxOffsetX;
-    const currentSpriteY = player.y - (player.h - player.h) / 2 + player.hitboxOffsetY;
-    ctx.translate(currentSpriteX + player.visualOffsetX + player.spriteW / 2, currentSpriteY + player.visualOffsetY + player.h / 2);
-    if (!player.anim.facingRight) { ctx.scale(-1, 1); }
+    
+    // Calcule le coin supérieur gauche pour dessiner le sprite.
+    // Ceci centre visuellement le sprite sur la position logique de la hitbox (player.x, player.y)
+    // puis applique les décalages visuels.
+    const spriteDrawX = player.x + (player.w / 2) - (player.spriteW / 2) + player.visualOffsetX;
+    const spriteDrawY = player.y + (player.h / 2) - (player.spriteH / 2) + player.visualOffsetY;
+
+    // Le point autour duquel retourner le sprite est son centre visuel.
+    const flipAxisX = spriteDrawX + player.spriteW / 2;
+    
+    // Translater vers l'axe de retournement, mettre à l'échelle, et translater en arrière pour effectuer le retournement.
+    ctx.translate(flipAxisX, 0);
+    if (!player.anim.facingRight) {
+        ctx.scale(-1, 1);
+    }
+    ctx.translate(-flipAxisX, 0);
+
+    // Dessine le sprite si la ressource est chargée.
     if(assets.player && assets.player.complete && assets.player.naturalHeight !== 0) {
         const sprite = assets.player;
         const frameWidth = sprite.naturalWidth / player.frameCount;
         const frameHeight = sprite.naturalHeight;
         const sourceX = player.anim.frame * frameWidth;
+
+        // Applique la transparence si le joueur est invincible.
         if (player.invincible && Date.now() % 200 < 100) {
             ctx.globalAlpha = 0.5;
         }
-        ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, -player.spriteW / 2, -player.h / 2, player.spriteW, player.h);
+
+        // Dessine l'image du sprite en utilisant ses dimensions visuelles (spriteW, spriteH),
+        // et non les dimensions de la hitbox (w, h).
+        ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, spriteDrawX, spriteDrawY, player.spriteW, player.spriteH);
+        
+        // Réinitialise la transparence.
         ctx.globalAlpha = 1.0;
     }
     ctx.restore();
+
 
     if(debugMode) {
         ctx.strokeStyle = 'rgba(255,0,0,0.5)';
