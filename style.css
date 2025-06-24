@@ -211,6 +211,22 @@ canvas {
     text-shadow: 4px 4px 0px #e67e22;
 }
 
+#main-menu h1 span {
+    display: inline-block;
+    position: relative;
+    animation: wave 1.5s infinite;
+    animation-delay: calc(0.1s * var(--i));
+}
+
+@keyframes wave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-15px);
+    }
+}
+
 /* Marge supérieure ajustée pour les boutons du menu principal */
 #main-menu button {
     margin-top: 15px;

@@ -147,7 +147,7 @@ let enemySpawnTimer = 0;
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 1.5, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -1021,7 +1021,7 @@ function startGame() {
     mainMenu.style.display = 'none';
     canvas.style.display = 'block';
     uiContainer.style.display = 'block';
-    soundControlsUI.style.display = 'none'; // CORRECTION: Cacher les contrôles du son
+    soundControlsUI.style.display = 'none';
 
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -1455,6 +1455,20 @@ function init(){
 document.addEventListener('DOMContentLoaded', () => {
     // Appelle la fonction d'initialisation pour démarrer le jeu
     init();
+
+    // Animation du titre
+    const title = document.querySelector('#main-menu h1');
+    const text = title.textContent;
+    title.innerHTML = ''; 
+    for (let i = 0; i < text.length; i++) {
+        const span = document.createElement('span');
+        span.textContent = text[i];
+        span.style.setProperty('--i', i);
+        if(text[i] === ' '){
+            span.innerHTML = '&nbsp;';
+        }
+        title.appendChild(span);
+    }
 
     document.getElementById('startGameButton').addEventListener('click', startGame);
     document.getElementById('upgradesMenuButton').addEventListener('click', showUpgradesMenu);
