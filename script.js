@@ -147,7 +147,7 @@ let enemySpawnTimer = 0;
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 1, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1.5, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -1019,16 +1019,17 @@ function gameLoop(timestamp){
 // Fonction pour démarrer le jeu
 function startGame() {
     mainMenu.style.display = 'none';
-    mainMenuGoldUI.style.display = 'none';
-    soundControlsUI.style.display = 'none';
+    canvas.style.display = 'block';
+    uiContainer.style.display = 'block';
+    soundControlsUI.style.display = 'none'; // CORRECTION: Cacher les contrôles du son
 
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
     }
 
-    resetPlayerState(); // Réinitialise le joueur avant de commencer
-    loadGameData();     // Charge les données pour appliquer l'or etc.
+    resetPlayerState(); 
+    loadGameData();     
 
     gameState.gameStarted = true;
     gameState.running = true;
@@ -1064,6 +1065,9 @@ function resumeGame() {
 function quitGame() {
     saveGameData();
 
+    canvas.style.display = 'none';
+    uiContainer.style.display = 'none';
+
     enemies = [];
     projectiles = [];
     xpGems = [];
@@ -1081,7 +1085,7 @@ function quitGame() {
     mainMenuGoldUI.style.display = 'block';
     soundControlsUI.style.display = 'flex';
     
-    loadGameData(); // Recharge les données pour mettre à jour l'affichage de l'or
+    loadGameData(); 
     updateMainMenuGoldDisplay();
 
     if (animationFrameId) {
@@ -1155,7 +1159,6 @@ function loadGameData() {
         const storedUpgrades = localStorage.getItem('permanentUpgrades');
         if (storedUpgrades) {
             const savedUpgrades = JSON.parse(storedUpgrades);
-            // Fusionne les améliorations sauvegardées avec celles par défaut pour éviter les erreurs si de nouvelles améliorations sont ajoutées au code
             for (const key in permanentUpgrades) {
                 if (savedUpgrades[key]) {
                     permanentUpgrades[key] = savedUpgrades[key];
@@ -1163,10 +1166,8 @@ function loadGameData() {
             }
         }
 
-        // Crée l'objet player et applique les stats de base + améliorations permanentes
         resetPlayerState();
 
-        // Charge l'or et l'applique au joueur
         const storedGold = localStorage.getItem('playerGold');
         if (storedGold !== null) {
             player.gold = parseInt(storedGold, 10);
@@ -1197,7 +1198,6 @@ function loadGameData() {
 
     } catch (error) {
         console.error("Erreur lors du chargement depuis localStorage :", error);
-        // En cas d'erreur, on s'assure que le joueur est dans un état de base fonctionnel
         resetPlayerState();
         player.gold = 0;
     }
@@ -1435,6 +1435,9 @@ function init(){
     upgradesBackButton = document.getElementById('upgradesBackButton');
     upgradesMenuGoldUI = document.getElementById('upgrades-menu-gold');
     
+    canvas.style.display = 'none';
+    uiContainer.style.display = 'none';
+
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     createBackgroundAndObstacles();
