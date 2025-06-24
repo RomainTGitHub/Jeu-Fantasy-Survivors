@@ -56,7 +56,8 @@ let persistentStats = {
     totalXpGained: 0,
     totalGoldGained: 0,
     totalLevelsGained: 0,
-    totalPlaytime: 0 // en millisecondes
+    totalPlaytime: 0, // en millisecondes
+    totalMagnetsCollected: 0 // NOUVEAU: Statistique pour les aimants
 };
 
 // --- Améliorations permanentes ---
@@ -553,7 +554,7 @@ function killEnemy(enemy){
     }
 
     // NOUVEAU: Chance de laisser tomber un aimant
-    if (Math.random() < 0.01) { // 1% de chance
+    if (Math.random() < 0.005) { // 0,5% de chance
         specialPickups.push({
             x: enemy.x + enemy.w / 2,
             y: enemy.y + enemy.h / 2,
@@ -713,6 +714,7 @@ function activateSuperMagnet() {
     // Marque toutes les gemmes et pièces pour qu'elles soient attirées
     xpGems.forEach(gem => gem.isPulledBySuperMagnet = true);
     goldCoins.forEach(coin => coin.isPulledBySuperMagnet = true);
+    persistentStats.totalMagnetsCollected++; // Incrémente la statistique
 }
 
 
@@ -1797,6 +1799,7 @@ function populateStatsMenu() {
         'Or total collecté': persistentStats.totalGoldGained,
         'Niveaux gagnés': persistentStats.totalLevelsGained,
         'XP totale collectée': Math.floor(persistentStats.totalXpGained),
+        'Aimants ramassés': persistentStats.totalMagnetsCollected, // Statistique ajoutée
         'Temps de jeu total': formatPlaytime(persistentStats.totalPlaytime)
     };
 
