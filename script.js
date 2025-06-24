@@ -191,7 +191,7 @@ let enemySpawnTimer = 0;
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 1, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1.2, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -235,10 +235,10 @@ function resetPlayerState() {
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
 const enemyDefinitions={
-    goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
-    skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80, hitboxOffsetX: 12, hitboxOffsetY: 5, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:20,damage:10,xp:5, frameCount: 8, animSpeed: 20},
-    slime:{type:'slime',w:40,h:30,spriteW:100,spriteH:80, hitboxOffsetX: 30, hitboxOffsetY: 30, visualOffsetX: 0, visualOffsetY: 0, speed:0.8,health:30,damage:8,xp:7, frameCount: 16, animSpeed: 25},
-    orc:{type:'orc',w:50,h:110,spriteW:128,spriteH:160, hitboxOffsetX: 35, hitboxOffsetY: 22, visualOffsetX: 0, visualOffsetY: 0, speed:1.2,health:50,damage:15,xp:15, frameCount: 13, animSpeed: 18},
+    goblin:{type:'goblin',w:35,h:60,spriteW:128,spriteH:160, hitboxOffsetX: 45, hitboxOffsetY: 70, visualOffsetX: 0, visualOffsetY: 0, speed:0.6,health:8,damage:4,xp:2, frameCount: 10, animSpeed: 10},
+    skeleton:{type:'skeleton',w:40,h:70,spriteW:64,spriteH:80, hitboxOffsetX: 12, hitboxOffsetY: 5, visualOffsetX: 0, visualOffsetY: 0, speed:1,health:20,damage:10,xp:15, frameCount: 8, animSpeed: 20},
+    slime:{type:'slime',w:40,h:30,spriteW:100,spriteH:80, hitboxOffsetX: 30, hitboxOffsetY: 30, visualOffsetX: 0, visualOffsetY: 0, speed:0.4,health:30,damage:8,xp:50, frameCount: 16, animSpeed: 25},
+    orc:{type:'orc',w:50,h:110,spriteW:128,spriteH:160, hitboxOffsetX: 35, hitboxOffsetY: 22, visualOffsetX: 0, visualOffsetY: 0, speed:0.8,health:50,damage:15,xp:150, frameCount: 13, animSpeed: 18},
 };
 // Définitions des objets (ex: gemmes d'XP, or)
 const itemDefinitions = {
@@ -905,7 +905,7 @@ function updateWeapons(){
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
                 damage: boomerang.damage * player.damageMultiplier,
-                range: 300 * player.aoeMultiplier,
+                range: 450 * player.aoeMultiplier,
                 isReturning: false,
                 angle: 0,
                 rotationSpeed: pDef.rotationSpeed,
