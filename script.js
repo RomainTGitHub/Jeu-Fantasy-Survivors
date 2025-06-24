@@ -35,7 +35,10 @@ let sfxVolume = 1; // Volume des effets sonores par défaut (1 = 100%)
 
 // --- Améliorations permanentes ---
 let permanentUpgrades = {
-    maxHealth: { level: 0, cost: 500, maxLevel: 10 } // Le coût est désormais fixe
+    maxHealth: { level: 0, cost: 500, maxLevel: 10 },
+    speed: { level: 0, cost: 500, maxLevel: 10 },
+    damage: { level: 0, cost: 500, maxLevel: 10 },
+    regeneration: { level: 0, cost: 500, maxLevel: 10 }
 };
 
 const permanentUpgradeDefinitions = {
@@ -43,8 +46,24 @@ const permanentUpgradeDefinitions = {
         emoji: '❤️',
         title: 'PV Max',
         description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    speed: {
+        emoji: '👟',
+        title: 'Vitesse',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    damage: {
+        emoji: '⚔️',
+        title: 'Dégâts',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
+    },
+    regeneration: {
+        emoji: '✚',
+        title: 'Régénération',
+        description: (level, maxLevel) => `Niveau ${level} / ${maxLevel}`
     }
 };
+
 
 // --- Chargement des ressources ---
 const assets = {};
@@ -132,6 +151,7 @@ const initialPlayerState = {
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
+    damageMultiplier: 1,
     anim: { frame: 0, timer: 0, speed: 15, isMoving: false, facingRight: true },
     frameCount: 4, // Ajout de frameCount à initialPlayerState
     weapons: {
@@ -151,10 +171,11 @@ function resetPlayerState() {
     player.gold = currentGold;
 
     // Appliquer les améliorations permanentes
-    const baseHealth = 120;
-    const healthPerLevel = 50;
-    player.maxHealth = baseHealth + (permanentUpgrades.maxHealth.level * healthPerLevel);
+    player.maxHealth += permanentUpgrades.maxHealth.level * 50;
     player.health = player.maxHealth;
+    player.speed += permanentUpgrades.speed.level * 0.1;
+    player.regenerationRate += permanentUpgrades.regeneration.level * 0.1;
+    player.damageMultiplier = 1 + (permanentUpgrades.damage.level * 0.05);
 }
 
 // Définitions des ennemis (ajout de visualOffsetX et visualOffsetY)
@@ -676,7 +697,7 @@ function updateWeapons(){
                 h:mmDef.drawH,
                 vx:Math.cos(angle)*8,
                 vy:Math.sin(angle)*8,
-                damage:mm.damage,
+                damage: mm.damage * player.damageMultiplier,
                 lifespan: Math.ceil((canvas.width / 2) / 8),
                 angle:angle,
                 type: 'magicMissile',
@@ -687,8 +708,8 @@ function updateWeapons(){
             });
         }
     }
-    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=aura.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
-    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=aod.damage;if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
+    const aura=player.weapons.aura;if(aura.level>0){aura.rotation+=0.04;if(now-aura.lastTick>aura.cooldown){aura.lastTick=now;const orbW=16,orbH=16;for(let i=0;i<aura.orbCount;i++){const angle=aura.rotation+(i*(Math.PI*2)/aura.orbCount);const orbHitbox={x:player.x+player.w/2+Math.cos(angle)*aura.radius-orbW/2,y:player.y+player.h/2+Math.sin(angle)*aura.radius-orbH/2,w:orbW,h:orbH};enemies.forEach(enemy=>{if(checkCollision(orbHitbox,getHitbox(enemy))){enemy.currentHealth-=(aura.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}}}
+    const aod=player.weapons.auraOfDecay;if(aod.level>0&&now-aod.lastTick>aod.cooldown){aod.lastTick=now;enemies.forEach(enemy=>{const dx=(enemy.x+enemy.w/2)-(player.x+player.w/2);const dy=(enemy.y+enemy.h/2)-(player.y+player.h/2);const dist=Math.sqrt(dx*dx+dy*dy);if(dist<aod.radius){enemy.currentHealth-=(aod.damage * player.damageMultiplier);if(enemy.currentHealth<=0&&!enemy.isDead){killEnemy(enemy);}}});}
 }
 // Met à jour les projectiles
 function updateProjectiles(){
@@ -1084,20 +1105,22 @@ function populatePauseStats() {
         }
     }
     
-    // Calcule les PV max de base (avec améliorations permanentes)
-    const baseHealthWithUpgrades = 120 + (permanentUpgrades.maxHealth.level * 50);
+    const baseHealthWithUpgrades = initialPlayerState.maxHealth + (permanentUpgrades.maxHealth.level * 50);
+    const baseSpeedWithUpgrades = initialPlayerState.speed + (permanentUpgrades.speed.level * 0.1);
+    const baseRegenWithUpgrades = initialPlayerState.regenerationRate + (permanentUpgrades.regeneration.level * 0.1);
 
-    // Ne montre que les améliorations de PV max temporaires (en jeu)
     if (player.maxHealth > baseHealthWithUpgrades) {
         currentUpgrades.maxHealth = (player.maxHealth - baseHealthWithUpgrades) / 20;
     }
 
-    if (player.speed > initialPlayerState.speed) {
-        currentUpgrades.speed = (player.speed - initialPlayerState.speed) / 0.5;
+    if (player.speed > baseSpeedWithUpgrades) {
+        currentUpgrades.speed = Math.round((player.speed - baseSpeedWithUpgrades) / 0.5);
     }
-    if (player.regenerationRate > initialPlayerState.regenerationRate) {
-        currentUpgrades.regeneration = player.regenerationRate;
+    
+    if (player.regenerationRate > baseRegenWithUpgrades) {
+        currentUpgrades.regeneration = player.regenerationRate - baseRegenWithUpgrades;
     }
+
 
     const upgradeDisplayNames = {
         magicMissile: "Missile Magique",
@@ -1114,11 +1137,11 @@ function populatePauseStats() {
         const displayName = upgradeDisplayNames[upgradeId] || upgradeId;
 
         if (upgradeId === 'regeneration') {
-            li.textContent = `${displayName}: +${player.regenerationRate.toFixed(1)} PV/sec`;
+            li.textContent = `${displayName}: +${level.toFixed(1)} PV/sec`;
         } else if (upgradeId === 'maxHealth') {
              li.textContent = `${displayName}: +${level * 20} Vie Max`;
         } else if (upgradeId === 'speed') {
-            li.textContent = `${displayName}: +${(player.speed - initialPlayerState.speed).toFixed(1)} Vitesse`;
+            li.textContent = `${displayName}: Niveau ${level}`;
         } else {
             li.textContent = `${displayName}: Niveau ${level}`;
         }
@@ -1131,7 +1154,13 @@ function loadGameData() {
     try {
         const storedUpgrades = localStorage.getItem('permanentUpgrades');
         if (storedUpgrades) {
-            permanentUpgrades = JSON.parse(storedUpgrades);
+            const savedUpgrades = JSON.parse(storedUpgrades);
+            // Fusionne les améliorations sauvegardées avec celles par défaut pour éviter les erreurs si de nouvelles améliorations sont ajoutées au code
+            for (const key in permanentUpgrades) {
+                if (savedUpgrades[key]) {
+                    permanentUpgrades[key] = savedUpgrades[key];
+                }
+            }
         }
 
         // Crée l'objet player et applique les stats de base + améliorations permanentes
@@ -1232,7 +1261,6 @@ function buyPermanentUpgrade(key) {
     if (player.gold >= upgrade.cost && upgrade.level < upgrade.maxLevel) {
         player.gold -= upgrade.cost;
         upgrade.level++;
-        // La ligne qui augmente le coût est supprimée pour garder un prix fixe
         
         saveGameData();
         updateMainMenuGoldDisplay();
@@ -1251,8 +1279,6 @@ function updateUpgradeButton(btn, key) {
         costText = `Coût: ${upgrade.cost} or`;
     }
 
-    // Le bouton est un conteneur flex avec direction: column et justify-content: space-between.
-    // Cette structure poussera le coût vers le bas.
     btn.innerHTML = `
         <div>
             <div style="font-size: 24px;">${def.emoji}</div>
