@@ -4,78 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantasy Survivors</title>
-    <!-- Le lien vers l'icône doit aussi être corrigé -->
-    <link rel="icon" href="./images/icon.png" type="image/png">
+    <link rel="icon" href="https://placehold.co/32x32/FFD700/000000?text=%E2%9C%A8" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <!-- Correction du chemin vers la feuille de style -->
+    <!-- Lien vers la feuille de style externe -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="game-container">
-        <canvas id="game-canvas"></canvas>
-        <div id="ui-container">
-            <div id="tooltip" class="tooltip"></div>
-            <!-- Menu Principal -->
-            <div id="main-menu">
-                <canvas id="menu-background-canvas"></canvas>
-                <h1>Fantasy Survivors</h1>
-                <button id="startGameButton">Jouer</button>
-                <button id="upgradeMenuButton">Améliorations</button>
-                <button id="optionsButton">Options</button>
-                <div id="main-menu-gold">Or: 0</div>
-            </div>
-            <!-- Menu des améliorations permanentes -->
-            <div id="permanent-upgrades-menu" class="hidden">
-                <h2>Améliorations Permanentes</h2>
-                <div id="permanent-upgrades-list"></div>
-                <div id="permanent-upgrades-gold">Or: 0</div>
-                <button id="backToMainFromUpgrades">Retour</button>
-            </div>
-            <!-- Menu des options -->
-            <div id="options-menu" class="hidden">
-                <h2>Options</h2>
-                <div class="option">
-                    <label for="music-volume">Musique:</label>
-                    <input type="range" id="music-volume" min="0" max="1" step="0.1" value="0.5">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-container"></div>
+        <div id="tooltip" class="tooltip"></div>
+        <!-- Menu Principal -->
+        <div id="main-menu">
+            <canvas id="menu-background-canvas"></canvas>
+            <h1>Fantasy Survivors</h1>
+            <button id="startGameButton">Jouer !</button>
+            <button id="upgradesMenuButton">Améliorations</button>
+            <button id="statsMenuButton">Stats</button>
+            <button id="optionsMenuButton">Options</button>
+            <p id="main-menu-gold">Or: 0</p>
+        </div>
+
+        <!-- Menu des améliorations permanentes -->
+        <div id="permanent-upgrades-menu" class="modal">
+            <div class="modal-content">
+                <button id="resetUpgradesButton">Reset</button>
+                <h2>Améliorations</h2>
+                <div id="upgrades-grid">
+                    <!-- Les boutons d'amélioration seront ajoutés ici par JS -->
                 </div>
-                <div class="option">
-                    <label for="sfx-volume">Effets sonores:</label>
-                    <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="0.5">
-                </div>
-                <button id="backToMainFromOptions">Retour</button>
-            </div>
-            <!-- ATH (Affichage Tête Haute) en jeu -->
-            <div id="in-game-hud" class="hidden">
-                <div id="stats-container">
-                    <span>Niveau: <span id="player-level">1</span></span>
-                    <span>EXP: <span id="player-exp">0</span> / <span id="exp-to-next-level">10</span></span>
-                    <span>Chronomètre: <span id="game-timer">0:00</span></span>
-                    <span>Or: <span id="game-gold">0</span></span>
-                </div>
-                <div id="player-health-bar-container">
-                    <div id="player-health-bar"></div>
-                    <span id="player-health-text">100 / 100</span>
-                </div>
-            </div>
-            <!-- Écran de montée de niveau -->
-            <div id="level-up-screen" class="hidden">
-                <h2>Niveau Supérieur !</h2>
-                <p>Choisissez une amélioration :</p>
-                <div id="level-up-options"></div>
-            </div>
-            <!-- Écran de fin de partie -->
-            <div id="game-over-screen" class="hidden">
-                <h2>Partie Terminée</h2>
-                <p>Vagues survécues: <span id="waves-survived">0</span></p>
-                <p>Or collecté: <span id="gold-collected">0</span></p>
-                <button id="restart-game">Rejouer</button>
-                <button id="return-to-main-menu">Menu Principal</button>
+                <p id="upgrades-menu-gold">Or: 0</p>
+                <button id="upgradesBackButton">Retour</button>
             </div>
         </div>
+
+        <!-- Menu des statistiques -->
+        <div id="stats-menu" class="modal">
+            <div class="modal-content">
+                <h2>Statistiques</h2>
+                <div id="stats-container">
+                    <h3>Personnage</h3>
+                    <div id="character-stats-grid" class="stats-grid"></div>
+                    <h3>Globales</h3>
+                    <div id="global-stats-grid" class="stats-grid"></div>
+                </div>
+                <button id="statsBackButton">Retour</button>
+            </div>
+        </div>
+
+
+        <!-- Modal de confirmation de réinitialisation -->
+        <div id="reset-confirmation-modal" class="modal">
+            <div class="modal-content">
+                <h2>Réinitialiser?</h2>
+                <p>Toutes vos améliorations seront réinitialisées et votre or sera remboursé. Êtes-vous sûr ?</p>
+                <button id="confirmResetButton">Oui</button>
+                <button id="cancelResetButton">Non</button>
+            </div>
+        </div>
+
+
+        <!-- Menu Pause -->
+        <div id="pause-modal" class="modal">
+            <div class="modal-content">
+                <h2>PAUSE</h2>
+                <div id="pause-stats">
+                    <p id="pause-level">Niveau: </p>
+                    <p id="pause-timer">Temps écoulé: </p>
+                    <p id="pause-kill-count">Kills: </p>
+                </div>
+                <div id="pause-upgrades">
+                    <h3>Améliorations:</h3>
+                    <ul id="pause-upgrades-list"></ul>
+                </div>
+                <button onclick="resumeGame()">Reprendre</button>
+                <button onclick="showOptionsFromPause()">Options</button>
+                <button onclick="quitGame()">Quitter la partie</button>
+            </div>
+        </div>
+        <!-- Menu Options -->
+        <div id="options-modal" class="modal">
+            <div class="modal-content">
+                <h2>OPTIONS</h2>
+                <div class="volume-control">
+                    <label for="music-volume-slider">Volume Musique:</label>
+                    <input type="range" id="music-volume-slider" min="0" max="1" step="0.01" value="1">
+                </div>
+                <div class="volume-control">
+                    <label for="sfx-volume-slider">Volume Effets Sonores:</label>
+                    <input type="range" id="sfx-volume-slider" min="0" max="1" step="0.01" value="1">
+                </div>
+                <button id="optionsBackButton">Retour</button>
+            </div>
+        </div>
+        <!-- Écran de Victoire -->
+        <div id="victory-modal" class="modal">
+            <div class="modal-content">
+                <h2>VICTOIRE !</h2>
+                <p>Vous avez survécu 30 minutes !</p>
+                <button onclick="window.location.reload()">Recommencer</button>
+            </div>
+        </div>
+
+        <!-- Contrôles du son -->
+        <div id="sound-controls">
+            <button id="toggle-music-button">Musique: ON</button>
+            <button id="toggle-sfx-button">Effets Sonores: ON</button>
+        </div>
     </div>
-    <!-- Correction du chemin vers le script -->
-    <script src="script.js"></script>
+
+    <!-- Élément audio pour la musique de fond -->
+    <audio id="background-music" loop>
+        <source src="music/mainmenumusic.mp3" type="audio/mpeg">
+        Votre navigateur ne supporte pas l'élément audio.
+    </audio>
+
+    <!-- Lien vers le script externe, 'defer' assure que le script s'exécute après le chargement du HTML -->
+    <script src="script.js" defer></script>
 </body>
 </html>
