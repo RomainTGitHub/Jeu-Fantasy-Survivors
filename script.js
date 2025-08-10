@@ -1,5 +1,5 @@
 // Variables globales pour l'état du jeu et les éléments de l'interface utilisateur
-const canvas = document.getElementById('gameCanvas');
+const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const gameContainer = document.getElementById('game-container');
 const uiContainer = document.getElementById('ui-container');
