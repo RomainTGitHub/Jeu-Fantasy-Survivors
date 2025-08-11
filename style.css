@@ -137,6 +137,7 @@ canvas {
     max-width: 650px;
     max-height: 90vh; /* Limite la hauteur pour éviter le débordement */
     overflow-y: auto;  /* Ajoute une barre de défilement si le contenu est trop grand */
+    overflow-x: hidden; /* Empêche le défilement horizontal */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -307,10 +308,15 @@ button:disabled {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    font-size: 11px; /* Taille de police réduite */
+}
+
+.permanent-upgrade-btn > div > div:nth-child(2) {
+    margin-bottom: 5px; /* Ajoute un espace sous le titre */
 }
 
 .upgrade-cost {
-    font-size: 12px;
+    font-size: 10px; /* Taille de police réduite */
 }
 
 #resetUpgradesButton {
@@ -548,21 +554,41 @@ button:disabled {
     right: 10px;
     z-index: 30;
     display: flex; /* Affiché par défaut */
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: 7px;
 }
 
 #sound-controls button {
-    padding: 10px 15px;
-    font-size: 14px;
+    font-size: 20px; /* Taille de l'icône */
+    padding: 8px;
+    min-width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s ease-in-out; /* Ajout d'une transition douce */
 }
 
 .btn-text {
+    display: none; /* Cache le texte par défaut */
     margin-left: 8px;
+    font-size: 14px; /* Taille de police pour le texte au survol */
+    white-space: nowrap; /* Empêche le texte de passer à la ligne */
 }
+
+/* Effet au survol pour les appareils avec souris */
+@media (hover: hover) {
+    #sound-controls button:hover {
+        min-width: auto; /* Permet au bouton de s'élargir */
+        padding: 8px 15px; /* Ajuste le padding pour le texte */
+    }
+
+    #sound-controls button:hover .btn-text {
+        display: inline; /* Affiche le texte au survol */
+    }
+}
+
 
 #fullscreenButton {
     display: none; /* Affiché via JS si compatible */
@@ -637,23 +663,6 @@ button:disabled {
     #gold-display { font-size: 12px; }
     #pause-upgrades-list li { font-size: 12px; }
     .stat-entry { font-size: 12px; }
-
-    /* Styles pour les contrôles du son en mode mobile */
-    #sound-controls {
-        flex-direction: row;
-        align-items: center;
-    }
-
-    #sound-controls button {
-        font-size: 20px; /* Taille de l'icône */
-        padding: 8px;
-        min-width: 40px;
-        height: 40px;
-    }
-
-    #sound-controls button .btn-text {
-        display: none; /* Cache le texte */
-    }
 }
 
 @media (max-width: 480px) {
