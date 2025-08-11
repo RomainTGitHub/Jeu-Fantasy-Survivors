@@ -117,7 +117,7 @@ canvas {
 /* Style pour l'affichage de l'or */
 #gold-display {
     position: absolute;
-    top: 100px;
+    top: 110px;
     bottom: 5px;
     right: 5px;
     font-size: 16px;
@@ -258,7 +258,7 @@ canvas {
 }
 
 #main-menu h1 {
-    font-size: 48px;
+    font-size: clamp(26px, 8vw, 48px);
     color: #f1c40f;
     margin-bottom: 40px;
     text-shadow: 4px 4px 0px #e67e22;
@@ -472,7 +472,7 @@ canvas {
 /* Styles pour les icônes de statut en jeu */
 #status-icons-container {
     position: absolute;
-    top: 85px; /* Positionné sous la barre de vie */
+    top: 105px; /* Positionné sous la barre de vie */
     left: 0;
     display: flex;
     flex-direction: column;
@@ -595,10 +595,151 @@ canvas {
     transition: transform 0.05s ease-out; /* Pour un retour en douceur */
 }
 
+/*
+========================================
+--- Styles pour le mode Plein Écran ---
+========================================
+*/
+
+/* On ajoute le nouveau bouton à la liste des boutons existants pour qu'il ait le même style */
+#game-over-modal button,
+#main-menu button,
+#pause-modal button,
+#victory-modal button,
+#options-modal button,
+#permanent-upgrades-menu button,
+#reset-confirmation-modal button,
+#stats-menu button,
+#fullscreenButton { /* On ajoute notre bouton ici */
+    font-family: 'Press Start 2P', cursive;
+    font-size: 16px;
+    padding: 15px 30px;
+    background-color: #f1c40f;
+    color: #1a1a1a;
+    border: none;
+    cursor: pointer;
+    margin-top: 20px;
+    border-radius: 5px;
+    transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out;
+}
+
+/* Le bouton plein écran sera caché par défaut, et affiché seulement si le navigateur est compatible (via JS) */
+#fullscreenButton {
+    display: none;
+}
+
+/* Ces styles s'appliquent au conteneur du jeu UNIQUEMENT quand il est en mode plein écran */
+#game-container:fullscreen {
+    /* On force le conteneur à prendre 100% de l'espace, ignorant la fonction clamp() */
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+
+    /* On s'assure qu'il n'y a pas de bordure en plein écran pour une immersion totale */
+    border: none;
+}
+
 /* Afficher les contrôles uniquement sur les écrans tactiles/petits */
 /* (hover: none) and (pointer: coarse) est une bonne heuristique pour les appareils tactiles */
 @media (hover: none) and (pointer: coarse) {
     #mobile-controls {
         display: block;
+    }
+}
+
+@media (max-width: 670px) {
+
+    /* Taille de police globale pour les petits écrans */
+    body {
+        font-size: 14px;
+    }
+
+    /* Réduction de la taille du titre principal */
+    #main-menu h1 {
+        /* Animation légèrement réduite pour ne pas être trop distrayante */
+        animation: none; 
+    }
+
+     /* Réduction de la taille des titres de modales (Pause, Game Over, etc.) */
+    .modal h2 {
+        font-size: 18px;
+    }
+
+    /* Réduction de la taille des boutons principaux et de leur espacement */
+    #main-menu button,
+    #pause-modal button,
+    #victory-modal button,
+    #options-modal button,
+    #permanent-upgrades-menu button,
+    #reset-confirmation-modal button,
+    #stats-menu button {
+        font-size: 14px;
+        padding: 12px 20px; /* On réduit le padding pour que les boutons soient moins hauts */
+    }
+
+    /* Réduction du texte des statistiques en jeu */
+    #stats {
+        font-size: 12px;
+    }
+
+    /* Réduction du texte sur les barres de vie/XP */
+    .bar-text {
+        font-size: 11px;
+    }
+
+     /* Réduction du texte pour l'or */
+    #gold-display {
+        font-size: 12px;
+    }
+
+    /* Réduction du texte dans le menu pause */
+    #pause-upgrades-list li {
+        font-size: 12px;
+    }
+
+    /* Réduction du texte dans le menu des statistiques */
+    .stat-entry {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 350px) {
+
+    /* Titres de modales adaptés */
+    .modal h2 {
+        font-size: 16px;
+    }
+
+    /* Boutons principaux plus compacts */
+    #main-menu button,
+    #pause-modal button,
+    #victory-modal button,
+    #options-modal button,
+    #permanent-upgrades-menu button,
+    #reset-confirmation-modal button,
+    #stats-menu button {
+        font-size: 12px;
+        padding: 10px 15px; /* Padding encore réduit */
+    }
+
+    /* Boutons d'améliorations permanentes plus petits */
+    .permanent-upgrade-btn {
+        font-size: 10px; /* Texte très petit pour tout faire rentrer */
+        height: 120px;   /* Boutons moins hauts */
+        padding: 10px;
+    }
+    .upgrade-cost {
+        font-size: 12px;
+    }
+
+    /* Stats en jeu et or en version minimale */
+    #stats, #gold-display {
+        font-size: 10px;
+    }
+
+    /* Texte sur les barres de vie/XP à sa plus petite taille lisible */
+    .bar-text {
+        font-size: 9px;
     }
 }

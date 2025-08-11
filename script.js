@@ -200,7 +200,7 @@ let joystickCenter = { x: 0, y: 0 };
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
     visualOffsetX: 0, visualOffsetY: -10,
-    speed: 1.2, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
+    speed: 1.4, health: 120, maxHealth: 120, xp: 0, level: 1, xpToNextLevel: 8, magnetRadius: 100, gold: 0, // L'or sera chargé depuis localStorage séparément
     regenerationRate: 0,
     invincible: false,
     invincibilityEndTime: 0,
@@ -2050,6 +2050,36 @@ function setupMobileControls() {
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: false });
     document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    const fullscreenButton = document.getElementById('fullscreenButton');
+    const gameContainer = document.getElementById('game-container');
+
+    // On vérifie si l'API Fullscreen est supportée par le navigateur
+    if (document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled || document.msFullscreenEnabled) {
+        // Si oui, on affiche le bouton
+        fullscreenButton.style.display = 'block';
+
+        fullscreenButton.addEventListener('click', () => {
+            // Si on est déjà en plein écran, on quitte
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                // Sinon, on demande le plein écran pour le conteneur du jeu
+                gameContainer.requestFullscreen().catch(err => {
+                    alert(`Erreur lors du passage en plein écran : ${err.message} (${err.name})`);
+                });
+            }
+        });
+
+        // Très important : on écoute les changements d'état du plein écran
+        // pour redimensionner le canvas correctement.
+        document.addEventListener('fullscreenchange', () => {
+            // On attend un court instant pour que le navigateur ait fini sa transition
+            setTimeout(() => {
+                resizeCanvas();
+            }, 100);
+        });
+    }
 }
 
 // Fonction d'initialisation du jeu
@@ -2076,7 +2106,8 @@ function init(){
             Or: <span id="gold-count">0</span>
         </div>
     `;
-    document.body.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
+        gameContainer.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
+
 
     levelUI=document.getElementById('level');
     timerUI=document.getElementById('timer');
@@ -2157,17 +2188,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Animation du titre
     const title = document.querySelector('#main-menu h1');
-    const text = title.textContent;
-    title.innerHTML = ''; 
-    for (let i = 0; i < text.length; i++) {
-        const span = document.createElement('span');
-        span.textContent = text[i];
-        span.style.setProperty('--i', i);
-        if(text[i] === ' '){
-            span.innerHTML = '&nbsp;';
-        }
-        title.appendChild(span);
+const text = title.textContent.trim(); // "Fantasy Survivors"
+const words = text.split(' '); // ["Fantasy", "Survivors"]
+title.innerHTML = ''; // On vide le H1
+
+let letterIndex = 0;
+words.forEach((word, wordIndex) => {
+    // Crée un conteneur pour le mot
+    const wordWrapper = document.createElement('span');
+    wordWrapper.style.display = 'inline-block'; // Garde les lettres du mot ensemble
+
+    // Crée les spans pour chaque lettre du mot
+    for (let i = 0; i < word.length; i++) {
+        const letterSpan = document.createElement('span');
+        letterSpan.textContent = word[i];
+        letterSpan.style.setProperty('--i', letterIndex++);
+        wordWrapper.appendChild(letterSpan);
     }
+
+    // Ajoute le mot complet (avec ses lettres) au titre
+    title.appendChild(wordWrapper);
+
+    // Ajoute un espace après chaque mot, sauf le dernier
+    if (wordIndex < words.length - 1) {
+        title.appendChild(document.createTextNode(' '));
+        letterIndex++; // On compte l'espace pour l'index de l'animation
+    }
+});
 
     document.getElementById('startGameButton').addEventListener('click', startGame);
     document.getElementById('upgradesMenuButton').addEventListener('click', showUpgradesMenu);
@@ -2204,3 +2251,4 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     });
 });
+
