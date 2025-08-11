@@ -209,12 +209,6 @@ let projectiles = [], enemies = [], xpGems = [], goldCoins = [], specialPickups 
 let enemySpawnTimer = 0;
 let xpMergeTimer = 0; // Timer pour la fusion des gemmes d'XP
 
-// --- CONTRÔLES MOBILES ---
-let joystickStick, joystickBase;
-let joystickActive = false;
-let joystickTouchId = null;
-let joystickRadius = 0;
-let joystickCenter = { x: 0, y: 0 };
 
 // Propriétés initiales du joueur à utiliser pour la réinitialisation
 const initialPlayerState = {
@@ -1993,119 +1987,6 @@ function menuAnimationLoop() {
     menuAnimationId = requestAnimationFrame(menuAnimationLoop);
 }
 
-// --- NOUVELLE FONCTION POUR LES CONTRÔLES MOBILES ---
-function setupMobileControls() {
-    if (!joystickBase) return; // Ne rien faire si les contrôles n'existent pas
-
-    joystickRadius = joystickBase.offsetWidth / 2;
-
-    const handleTouchStart = (e) => {
-        e.preventDefault();
-        if (joystickTouchId === null) {
-            const touch = e.changedTouches[0];
-            joystickTouchId = touch.identifier;
-            joystickActive = true;
-            const rect = joystickBase.getBoundingClientRect();
-            joystickCenter = {
-                x: rect.left + joystickRadius,
-                y: rect.top + joystickRadius
-            };
-        }
-    };
-
-    const handleTouchMove = (e) => {
-        if (!joystickActive) return;
-        e.preventDefault();
-
-        let touch = null;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === joystickTouchId) {
-                touch = e.changedTouches[i];
-                break;
-            }
-        }
-
-        if (touch) {
-            let dx = touch.clientX - joystickCenter.x;
-            let dy = touch.clientY - joystickCenter.y;
-            const distance = Math.hypot(dx, dy);
-
-            // Limiter le stick à l'intérieur de la base
-            if (distance > joystickRadius) {
-                dx = (dx / distance) * joystickRadius;
-                dy = (dy / distance) * joystickRadius;
-            }
-
-            joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
-
-            // Mettre à jour l'état des touches pour le mouvement du joueur
-            const threshold = joystickRadius * 0.2; // Seuil pour activer le mouvement
-            keys['w'] = keys['z'] = dy < -threshold;
-            keys['s'] = dy > threshold;
-            keys['a'] = keys['q'] = dx < -threshold;
-            keys['d'] = dx > threshold;
-        }
-    };
-
-    const handleTouchEnd = (e) => {
-        if (!joystickActive) return;
-
-        let touchEnded = false;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === joystickTouchId) {
-                touchEnded = true;
-                break;
-            }
-        }
-
-        if (touchEnded) {
-            joystickActive = false;
-            joystickTouchId = null;
-            joystickStick.style.transform = 'translate(0, 0)';
-            // Réinitialiser toutes les touches de mouvement
-            keys['w'] = keys['z'] = false;
-            keys['s'] = false;
-            keys['a'] = keys['q'] = false;
-            keys['d'] = false;
-        }
-    };
-
-    joystickBase.addEventListener('touchstart', handleTouchStart, { passive: false });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { passive: false });
-    document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-
-    const fullscreenButton = document.getElementById('fullscreenButton');
-    const gameContainer = document.getElementById('game-container');
-
-    // On vérifie si l'API Fullscreen est supportée par le navigateur
-    if (document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled || document.msFullscreenEnabled) {
-        // Si oui, on affiche le bouton
-        fullscreenButton.style.display = 'block';
-
-        fullscreenButton.addEventListener('click', () => {
-            // Si on est déjà en plein écran, on quitte
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                // Sinon, on demande le plein écran pour le conteneur du jeu
-                gameContainer.requestFullscreen().catch(err => {
-                    alert(`Erreur lors du passage en plein écran : ${err.message} (${err.name})`);
-                });
-            }
-        });
-
-        // Très important : on écoute les changements d'état du plein écran
-        // pour redimensionner le canvas correctement.
-        document.addEventListener('fullscreenchange', () => {
-            // On attend un court instant pour que le navigateur ait fini sa transition
-            setTimeout(() => {
-                resizeCanvas();
-            }, 100);
-        });
-    }
-}
-
 // Fonction d'initialisation du jeu
 function init(){
     document.getElementById('ui-container').innerHTML=`
@@ -2209,6 +2090,79 @@ function playButtonClickSound() {
         assets.clickSound.volume = sfxVolume;
         assets.clickSound.currentTime = 0;
         assets.clickSound.play();
+    }
+}
+
+function setupMobileControls() {
+    const upButton = document.getElementById('up-button');
+    const downButton = document.getElementById('down-button');
+    const leftButton = document.getElementById('left-button');
+    const rightButton = document.getElementById('right-button');
+
+    if (!upButton) return;
+
+    // Fonction pour gérer l'appui sur un bouton
+    const handlePress = (key) => {
+        return (e) => {
+            e.preventDefault();
+            keys[key] = true;
+        };
+    };
+
+    // Fonction pour gérer le relâchement d'un bouton
+    const handleRelease = (key) => {
+        return (e) => {
+            e.preventDefault();
+            keys[key] = false;
+        };
+    };
+
+    // Écouteurs d'événements pour le mouvement avec les touches ZQSD
+    upButton.addEventListener('touchstart', handlePress('z'), { passive: false });
+    upButton.addEventListener('touchend', handleRelease('z'), { passive: false });
+    upButton.addEventListener('touchcancel', handleRelease('z'), { passive: false });
+
+    downButton.addEventListener('touchstart', handlePress('s'), { passive: false });
+    downButton.addEventListener('touchend', handleRelease('s'), { passive: false });
+    downButton.addEventListener('touchcancel', handleRelease('s'), { passive: false });
+
+    leftButton.addEventListener('touchstart', handlePress('q'), { passive: false });
+    leftButton.addEventListener('touchend', handleRelease('q'), { passive: false });
+    leftButton.addEventListener('touchcancel', handleRelease('q'), { passive: false });
+
+    rightButton.addEventListener('touchstart', handlePress('d'), { passive: false });
+    rightButton.addEventListener('touchend', handleRelease('d'), { passive: false });
+    rightButton.addEventListener('touchcancel', handleRelease('d'), { passive: false });
+
+
+    const fullscreenButton = document.getElementById('fullscreenButton');
+    const gameContainer = document.getElementById('game-container');
+
+    // On vérifie si l'API Fullscreen est supportée par le navigateur
+    if (document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled || document.msFullscreenEnabled) {
+        // Si oui, on affiche le bouton
+        fullscreenButton.style.display = 'block';
+
+        fullscreenButton.addEventListener('click', () => {
+            // Si on est déjà en plein écran, on quitte
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                // Sinon, on demande le plein écran pour le conteneur du jeu
+                gameContainer.requestFullscreen().catch(err => {
+                    alert(`Erreur lors du passage en plein écran : ${err.message} (${err.name})`);
+                });
+            }
+        });
+
+        // Très important : on écoute les changements d'état du plein écran
+        // pour redimensionner le canvas correctement.
+        document.addEventListener('fullscreenchange', () => {
+            // On attend un court instant pour que le navigateur ait fini sa transition
+            setTimeout(() => {
+                resizeCanvas();
+            }, 100);
+        });
     }
 }
 

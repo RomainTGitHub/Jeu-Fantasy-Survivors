@@ -586,28 +586,39 @@ canvas {
     left: 30px;
     z-index: 100;
     display: none; /* Caché par défaut */
-    user-select: none; /* Empêcher la sélection de texte */
+    user-select: none;
+    /* Utilisation de Flexbox pour une disposition en colonne */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centre les éléments enfants horizontalement */
+    gap: 10px; /* Ajoute un espace entre le bouton Z et le groupe QSD */
 }
 
-#joystick-base {
-    width: 120px;
-    height: 120px;
+.azerty-horizontal-row {
+    display: flex;
+    justify-content: center; /* Centre les boutons Q, S, D */
+    gap: 10px; /* Ajoute de l'espace entre les boutons */
+}
+
+/* Les styles .zqs-button restent inchangés */
+.zqs-button {
+    width: 60px;
+    height: 60px;
     background-color: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    position: relative;
+    color: white;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 24px;
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    touch-action: manipulation;
 }
 
-#joystick-stick {
-    width: 60px;
-    height: 60px;
-    background-color: rgba(255, 255, 255, 0.4);
-    border-radius: 50%;
-    position: absolute;
-    transition: transform 0.05s ease-out; /* Pour un retour en douceur */
+.zqs-button:active {
+    background-color: rgba(255, 255, 255, 0.5);
 }
 
 /*
