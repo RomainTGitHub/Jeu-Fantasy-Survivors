@@ -123,48 +123,68 @@ const assetSources = {
     background: 'images/background.png',
     obstacle: 'images/obstacles.png',
     gold: 'images/gold_spritesheet.png', // Nouvelle feuille de sprites pour l'or
-    magicMissileSound: 'soundeffect/magicprojectile.mp3' // Ajout du chemin du son du projectile magique
+    magicMissileSound: 'soundeffect/magicprojectile.mp3', // Ajout du chemin du son du projectile magique
+    clickSound: 'soundeffect/clicsound.mp3', // Chemin du son de clic
 };
 
 // Charge toutes les images définies dans assetSources
 function loadAssets(callback) {
     let loadedCount = 0;
-    const totalAssets = Object.keys(assetSources).length;
-    for (const key in assetSources) {
-        // Vérifie si la ressource est une image ou un fichier audio
-        if (key.includes('Sound')) {
-            // Pour l'audio, pas besoin de créer un objet Image, on incrémente juste le compteur
-            loadedCount++;
-            if (loadedCount === totalAssets) {
-                callback();
-            }
+    const assetKeys = Object.keys(assetSources);
+    const totalAssets = assetKeys.length;
+
+    if (totalAssets === 0) {
+        callback();
+        return;
+    }
+
+    assetKeys.forEach(key => {
+        const source = assetSources[key];
+        
+        // Vérifie si la ressource est un son basé sur son extension
+        if (source.endsWith('.mp3') || source.endsWith('.wav') || source.endsWith('.ogg')) {
+            // C'est un son
+            assets[key] = new Audio();
+            assets[key].src = source;
+            
+            // On attend l'événement 'canplaythrough' qui garantit que le son est prêt
+            assets[key].addEventListener('canplaythrough', () => {
+                loadedCount++;
+                if (loadedCount === totalAssets) {
+                    callback();
+                }
+            }, { once: true }); // L'écouteur se retire après le premier déclenchement
+
+            assets[key].addEventListener('error', () => {
+                console.error(`Échec du chargement du son : ${key}`);
+                loadedCount++; // On compte même en cas d'erreur pour ne pas bloquer le jeu
+                if (loadedCount === totalAssets) {
+                    callback();
+                }
+            });
+
         } else {
+            // C'est une image
             assets[key] = new Image();
-            assets[key].src = assetSources[key];
+            assets[key].src = source;
+            
             assets[key].onload = () => {
                 loadedCount++;
                 if (loadedCount === totalAssets) {
                     callback();
                 }
             };
-            // Gère les erreurs de chargement d'image en utilisant un carré magenta
+            
             assets[key].onerror = () => {
-                console.error(`Échec du chargement de la ressource : ${key} à ${assetSources[key]}`);
-                const canvas = document.createElement('canvas');
-                const w = 64, h = 64;
-                canvas.width = w;
-                canvas.height = h;
-                const assetCtx = canvas.getContext('2d');
-                assetCtx.fillStyle = 'magenta';
-                assetCtx.fillRect(0, 0, w, h);
-                assets[key].src = canvas.toDataURL();
+                console.error(`Échec du chargement de la ressource : ${key}`);
+                // ... (votre gestion d'erreur d'image existante)
                 loadedCount++;
                 if (loadedCount === totalAssets) {
                     callback();
                 }
             };
         }
-    }
+    });
 }
 
 // --- État du jeu et configuration du monde ---
@@ -2176,6 +2196,16 @@ function init(){
         menuAnimationLoop();
         draw(); 
     });
+    
+}
+function playButtonClickSound() {
+    // On vérifie si les effets sonores sont activés et si le son existe dans nos assets
+    if (areSoundEffectsOn && assets.clickSound) {
+        
+        assets.clickSound.volume = sfxVolume;
+        assets.clickSound.currentTime = 0;
+        assets.clickSound.play();
+    }
 }
 
 // Attendre que le DOM soit chargé pour ajouter les écouteurs d'événements
@@ -2246,9 +2276,22 @@ words.forEach((word, wordIndex) => {
         isMusicOn = false;
         toggleMusicButton.textContent = "Musique: OFF";
     });
+    
 
     gameContainer.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     });
+
+// Sélectionne TOUS les éléments <button> de la page
+    const allButtons = document.querySelectorAll('button');
+
+    // Ajoute un écouteur d'événement 'click' sur chaque bouton trouvé
+    allButtons.forEach(button => {
+        button.addEventListener('click', playButtonClickSound);
+    });
+    
 });
+
+
+
 

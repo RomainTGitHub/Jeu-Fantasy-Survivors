@@ -640,6 +640,47 @@ canvas {
     border: none;
 }
 
+/*
+========================================
+--- Styles pour les infos de contrôle ---
+========================================
+*/
+
+/* Conteneur principal pour le bloc d'information */
+.controls-info {
+    margin-top: 30px; /* Espace au-dessus pour le séparer des sliders */
+    margin-bottom: 20px; /* Espace en dessous avant le bouton "Retour" */
+    text-align: left;
+    background-color: rgba(0, 0, 0, 0.2); /* Fond légèrement visible pour le délimiter */
+    padding: 15px;
+    border: 2px solid #5a3d2b; /* Bordure cohérente avec le thème */
+    border-radius: 5px;
+}
+
+/* Style pour le sous-titre "Contrôles" */
+.controls-info h3 {
+    color: #f1c40f; /* Couleur or du thème */
+    margin: 0 0 15px 0; /* Marge en bas uniquement */
+    padding-bottom: 5px;
+    border-bottom: 2px solid #5a3d2b; /* Ligne de séparation */
+    text-align: center;
+}
+
+/* Style pour les paragraphes "Clavier :" et "Mobile :" */
+.controls-info p {
+    margin: 10px 0 5px 0;
+}
+
+/* Style pour les listes <ul> */
+.controls-info ul {
+    list-style: none; /* Supprime les puces par défaut */
+    padding-left: 10px;
+}
+
+/* Style pour chaque élément de la liste <li> */
+.controls-info li {
+    padding: 4px 0;
+}
 /* Afficher les contrôles uniquement sur les écrans tactiles/petits */
 /* (hover: none) and (pointer: coarse) est une bonne heuristique pour les appareils tactiles */
 @media (hover: none) and (pointer: coarse) {
