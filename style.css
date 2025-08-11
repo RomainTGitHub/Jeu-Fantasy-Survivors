@@ -22,23 +22,17 @@ body {
     width: clamp(320px, 90vw, 1400px);
     height: clamp(240px, 85vh, 900px);
     overflow: hidden;
-    /* Assurez-vous que le contenu ne déborde pas */
     transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out;
-    /* Transition douce pour le retour de dégâts */
 }
 
-/* Nouveau CSS pour le retour de dégâts */
 #game-container.damage-overlay {
     border-color: #ff0000;
-    /* Bordure rouge lors des dégâts */
     box-shadow: 0 0 25px 10px rgba(255, 0, 0, 0.7);
-    /* Effet de lueur rouge */
 }
 
 canvas {
     display: block;
     background-color: rgba(0, 0, 0, 0);
-    /* Secours */
     width: 100%;
     height: 100%;
 }
@@ -69,56 +63,38 @@ canvas {
     margin-top: 10px;
     overflow: hidden;
     position: relative;
-    /* Ajouté pour le positionnement absolu de bar-text */
 }
 
 #health-bar {
     height: 100%;
-}
-
-#xp-bar {
-    height: 100%;
-    transition: width 0.2s ease-in-out;
-}
-
-#health-bar {
     background-color: #c0392b;
 }
 
 #xp-bar {
+    height: 100%;
     background-color: #2980b9;
+    transition: width 0.2s ease-in-out;
 }
 
-/* Styles pour le texte sur les barres */
 .bar-text {
     position: absolute;
     top: 0;
-    /* Position explicite en haut */
     left: 0;
-    /* Position explicite à gauche */
     width: 100%;
     height: 100%;
-    /* Prend toute la hauteur du parent */
     display: flex;
-    /* Utilise flexbox pour le centrage */
     align-items: center;
-    /* Centre verticalement */
     justify-content: center;
-    /* Centre horizontalement */
     font-size: 14px;
     color: #fff;
     text-shadow: 1px 1px 1px #000;
     pointer-events: none;
-    /* S'assure qu'il ne bloque pas les clics */
     z-index: 1;
-    /* S'assure qu'il est au-dessus de la barre mais sous les autres UI */
 }
 
-/* Style pour l'affichage de l'or */
 #gold-display {
     position: absolute;
     top: 110px;
-    bottom: 5px;
     right: 5px;
     font-size: 16px;
     color: #f1c40f;
@@ -127,6 +103,11 @@ canvas {
     z-index: 5;
 }
 
+/*
+========================================
+--- Styles des Modales (Corrigé) ---
+========================================
+*/
 .modal {
     position: absolute;
     top: 0;
@@ -134,12 +115,31 @@ canvas {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
-    display: none;
+    display: none; /* Retour à la méthode originale */
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
     z-index: 10;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    position: relative;
+    background-color: #2c2c2c;
+    padding: 20px;
+    border: 4px solid #5a3d2b;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 650px;
+    max-height: 90vh; /* Limite la hauteur pour éviter le débordement */
+    overflow-y: auto;  /* Ajoute une barre de défilement si le contenu est trop grand */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
 .modal h2 {
@@ -148,49 +148,12 @@ canvas {
     margin-bottom: 20px;
 }
 
-.modal-content {
-    position: relative;
-    background-color: #2c2c2c;
-    padding: 30px;
-    border: 4px solid #5a3d2b;
-    border-radius: 10px;
-    width: 80%;
-    max-width: 600px;
-}
-
-.upgrade-option {
-    background-color: #4a4a4a;
-    border: 2px solid #eee;
-    padding: 15px;
-    margin: 10px 0;
-    cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s ease-in-out;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.upgrade-option:hover {
-    background-color: #f1c40f;
-    color: #1a1a1a;
-    transform: scale(1.02);
-}
-
-.upgrade-icon {
-    font-size: 28px;
-    width: 40px;
-    text-align: center;
-}
-
-#game-over-modal button,
-#main-menu button,
-#pause-modal button,
-#victory-modal button,
-#options-modal button,
-#permanent-upgrades-menu button,
-#reset-confirmation-modal button,
-#stats-menu button {
+/*
+========================================
+--- Styles des Boutons (Général) ---
+========================================
+*/
+button {
     font-family: 'Press Start 2P', cursive;
     font-size: 16px;
     padding: 15px 30px;
@@ -198,39 +161,30 @@ canvas {
     color: #1a1a1a;
     border: none;
     cursor: pointer;
-    margin-top: 20px;
+    margin: 10px 5px;
     border-radius: 5px;
     transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out;
 }
 
-#game-over-modal button:not([disabled]):hover,
-#main-menu button:not([disabled]):hover,
-#pause-modal button:not([disabled]):hover,
-#victory-modal button:not([disabled]):hover,
-#options-modal button:not([disabled]):hover,
-#permanent-upgrades-menu button:not([disabled]):hover,
-#reset-confirmation-modal button:not([disabled]):hover,
-#stats-menu button:not([disabled]):hover {
+button:not(:disabled):hover {
     transform: scale(1.05);
     background-color: #f3d058;
 }
 
-#resetUpgradesButton {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    padding: 5px 10px;
-    font-size: 12px;
-    background-color: #c0392b;
-    color: #fff;
-    margin-top: 0;
+button:disabled {
+    background-color: #555;
+    color: #888;
+    cursor: not-allowed;
+    border-color: #444;
 }
 
-#resetUpgradesButton:hover {
-    background-color: #e74c3c;
-}
+/*
+========================================
+--- Styles des Menus Spécifiques ---
+========================================
+*/
 
-/* Styles du menu principal */
+/* Menu Principal */
 #main-menu {
     position: absolute;
     top: 0;
@@ -238,13 +192,11 @@ canvas {
     width: 100%;
     height: 100%;
     background-color: rgba(55, 55, 55, 0.9);
-    display: flex;
+    display: flex; /* Affiché par défaut au lancement */
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    text-align: center;
     z-index: 20;
-    /* Assurez-vous qu'il est au-dessus de tout le reste */
 }
 
 #menu-background-canvas {
@@ -252,9 +204,9 @@ canvas {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 200px; /* Adjust as needed */
-    z-index: 1; /* Behind buttons but above background */
-    pointer-events: none; /* Make it unclickable */
+    height: 200px;
+    z-index: 1;
+    pointer-events: none;
 }
 
 #main-menu h1 {
@@ -274,33 +226,11 @@ canvas {
 }
 
 @keyframes wave {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-15px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
 }
 
-@keyframes breathing-effect {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.05); /* Le texte grossit de 5% */
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-}
-
-/* Marge supérieure ajustée pour les boutons du menu principal */
 #main-menu button {
-    margin-top: 15px;
-    margin-bottom: 5px;
     z-index: 2;
     position: relative;
 }
@@ -314,128 +244,87 @@ canvas {
     position: relative;
 }
 
-/* Styles pour les contrôles du son */
-#sound-controls {
-    position: absolute;
-    top: -10px;
-    right: 20px;
-    z-index: 30;
-    display: none;
-    flex-direction: column;
-    gap: 7px;
+.survival-text {
+    margin-top: 40px;
+    font-size: 14px;
+    color: #ffffff;
+    font-style: italic;
+    text-shadow: 1px 1px 1px #000;
+    animation: breathing-effect 1s ease-in-out infinite;
 }
 
-#sound-controls button {
+@keyframes breathing-effect {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+/* Menu Améliorations (Level up) */
+.upgrade-option {
+    background-color: #4a4a4a;
+    border: 2px solid #eee;
+    padding: 15px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s ease-in-out;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.upgrade-option:hover {
     background-color: #f1c40f;
     color: #1a1a1a;
-    border: none;
-    padding: 10px 15px;
-    font-family: 'Press Start 2P', cursive;
-    font-size: 14px;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out;
+    transform: scale(1.02);
 }
 
-#sound-controls button:hover {
-    transform: scale(1.05);
-    background-color: #f3d058;
+.upgrade-icon {
+    font-size: 28px;
+    width: 40px;
+    text-align: center;
 }
 
-/* Styles pour les curseurs de volume dans le modal d'options */
-.volume-control {
-    margin: 15px 0;
-    text-align: left;
-    width: 100%;
+/* Menu Améliorations Permanentes */
+#permanent-upgrades-menu .modal-content {
+    padding-top: 50px;
 }
 
-.volume-control label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 14px;
-    color: #fff;
-}
-
-.volume-control input[type="range"] {
-    width: 100%;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 10px;
-    background: #d3d3d3;
-    outline: none;
-    opacity: 0.7;
-    -webkit-transition: .2s;
-    transition: opacity .2s;
-    border-radius: 5px;
-}
-
-/* Pouce du curseur */
-.volume-control input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    background: #f1c40f;
-    cursor: pointer;
-    border-radius: 50%;
-    border: 2px solid #1a1a1a;
-}
-
-.volume-control input[type="range"]::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: #f1c40f;
-    cursor: pointer;
-    border-radius: 50%;
-    border: 2px solid #1a1a1a;
-}
-
-/* Styles pour le menu d'améliorations permanentes */
 #upgrades-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 15px;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 .permanent-upgrade-btn {
-    background-color: #f1c40f;
-    color: #1a1a1a;
-    border: 2px solid #1a1a1a;
-    padding: 15px;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s, transform 0.1s ease-in-out;
-    border-radius: 8px;
-    font-family: 'Press Start 2P', cursive;
-    font-size: 12px;
+    height: 120px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    align-items: center;
-    text-align: center;
-    height: 150px;
-}
-
-.permanent-upgrade-btn:not(:disabled):hover {
-    background-color: #e67e22;
-    border-color: #000;
-    transform: scale(1.05);
-}
-
-.permanent-upgrade-btn:disabled {
-    background-color: #555;
-    color: #888;
-    cursor: not-allowed;
-    border-color: #444;
 }
 
 .upgrade-cost {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #000;
+    font-size: 12px;
 }
 
-/* Styles pour le menu pause */
+#resetUpgradesButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    font-size: 12px;
+    background-color: #c0392b;
+    color: #fff;
+}
+
+#resetUpgradesButton:hover {
+    background-color: #e74c3c;
+}
+
+/* Menu Pause */
 #pause-stats {
     margin-bottom: 20px;
     text-align: left;
@@ -447,7 +336,8 @@ canvas {
     border-radius: 5px;
     padding: 15px;
     margin: 20px 0;
-    max-height: 120px;
+    width: 100%;
+    max-height: 150px;
     overflow-y: auto;
     text-align: left;
 }
@@ -484,16 +374,121 @@ canvas {
     text-align: center;
 }
 
-/* Styles pour les icônes de statut en jeu */
+/* Menu Options */
+.volume-control {
+    margin: 15px 0;
+    text-align: left;
+    width: 100%;
+}
+
+.volume-control label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.volume-control input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 10px;
+    background: #d3d3d3;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+    border-radius: 5px;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #f1c40f;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid #1a1a1a;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #f1c40f;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid #1a1a1a;
+}
+
+.controls-info {
+    margin-top: 30px;
+    margin-bottom: 20px;
+    text-align: left;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border: 2px solid #5a3d2b;
+    border-radius: 5px;
+    width: 100%;
+}
+
+.controls-info h3 {
+    color: #f1c40f;
+    margin: 0 0 15px 0;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #5a3d2b;
+    text-align: center;
+}
+
+.controls-info p { margin: 10px 0 5px 0; }
+.controls-info ul { list-style: none; padding-left: 10px; }
+.controls-info li { padding: 4px 0; }
+
+/* Menu Stats */
+#stats-container {
+    text-align: left;
+    width: 100%;
+}
+
+#stats-container h3 {
+    color: #f1c40f;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #5a3d2b;
+    padding-bottom: 5px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.stat-entry {
+    font-size: 12px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.stat-label { color: #ccc; }
+.stat-value { color: #f1c40f; font-weight: bold; }
+
+
+/*
+========================================
+--- Éléments d'UI en jeu ---
+========================================
+*/
+
+/* Icônes de statut */
 #status-icons-container {
     position: absolute;
-    top: 105px; /* Positionné sous la barre de vie */
+    top: 105px;
     left: 0;
     display: flex;
     flex-direction: column;
     gap: 5px;
     z-index: 5;
-    pointer-events: none; /* Le conteneur ne doit pas bloquer les clics */
+    pointer-events: none;
 }
 
 .icon-row {
@@ -513,7 +508,7 @@ canvas {
     font-size: 24px;
     position: relative;
     color: #fff;
-    pointer-events: all; /* Les icônes sont cliquables/survolables */
+    pointer-events: all;
 }
 
 .level-badge {
@@ -528,7 +523,7 @@ canvas {
     border: 1px solid #1a1a1a;
 }
 
-/* Styles pour l'info-bulle */
+/* Info-bulle */
 .tooltip {
     position: absolute;
     display: none;
@@ -543,43 +538,35 @@ canvas {
     white-space: nowrap;
 }
 
-/* Styles pour le menu des statistiques */
-#stats-container {
-    text-align: left;
+/* Contrôles du son et plein écran */
+#sound-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 30;
+    display: flex; /* Affiché par défaut */
+    flex-direction: column;
+    gap: 7px;
 }
 
-#stats-container h3 {
-    color: #f1c40f;
-    margin-top: 20px;
-    margin-bottom: 10px;
-    border-bottom: 2px solid #5a3d2b;
-    padding-bottom: 5px;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px;
-}
-
-.stat-entry {
-    background-color: #1a1a1a;
-    padding: 10px;
-    border-radius: 5px;
+#sound-controls button {
+    padding: 10px 15px;
     font-size: 14px;
 }
 
-.stat-label {
-    color: #ccc;
+#fullscreenButton {
+    display: none; /* Affiché via JS si compatible */
 }
 
-.stat-value {
-    color: #f1c40f;
-    font-weight: bold;
-    float: right;
+#game-container:fullscreen {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border: none;
 }
 
-/* Contrôles pour mobile */
+/* Contrôles mobile */
 #mobile-controls {
     position: absolute;
     bottom: 30px;
@@ -587,20 +574,17 @@ canvas {
     z-index: 100;
     display: none; /* Caché par défaut */
     user-select: none;
-    /* Utilisation de Flexbox pour une disposition en colonne */
-    display: flex;
     flex-direction: column;
-    align-items: center; /* Centre les éléments enfants horizontalement */
-    gap: 10px; /* Ajoute un espace entre le bouton Z et le groupe QSD */
+    align-items: center;
+    gap: 10px;
 }
 
 .azerty-horizontal-row {
     display: flex;
-    justify-content: center; /* Centre les boutons Q, S, D */
-    gap: 10px; /* Ajoute de l'espace entre les boutons */
+    justify-content: center;
+    gap: 10px;
 }
 
-/* Les styles .zqs-button restent inchangés */
 .zqs-button {
     width: 60px;
     height: 60px;
@@ -621,203 +605,43 @@ canvas {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
-/*
-========================================
---- Styles pour le mode Plein Écran ---
-========================================
-*/
-
-/* On ajoute le nouveau bouton à la liste des boutons existants pour qu'il ait le même style */
-#game-over-modal button,
-#main-menu button,
-#pause-modal button,
-#victory-modal button,
-#options-modal button,
-#permanent-upgrades-menu button,
-#reset-confirmation-modal button,
-#stats-menu button,
-#fullscreenButton { /* On ajoute notre bouton ici */
-    font-family: 'Press Start 2P', cursive;
-    font-size: 16px;
-    padding: 15px 30px;
-    background-color: #f1c40f;
-    color: #1a1a1a;
-    border: none;
-    cursor: pointer;
-    margin-top: 20px;
-    border-radius: 5px;
-    transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out;
-}
-
-/* Le bouton plein écran sera caché par défaut, et affiché seulement si le navigateur est compatible (via JS) */
-#fullscreenButton {
-    display: none;
-}
-
-/* Ces styles s'appliquent au conteneur du jeu UNIQUEMENT quand il est en mode plein écran */
-#game-container:fullscreen {
-    /* On force le conteneur à prendre 100% de l'espace, ignorant la fonction clamp() */
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    max-height: none;
-
-    /* On s'assure qu'il n'y a pas de bordure en plein écran pour une immersion totale */
-    border: none;
-}
-
-/*
-========================================
---- Styles pour les infos de contrôle ---
-========================================
-*/
-
-/* Conteneur principal pour le bloc d'information */
-.controls-info {
-    margin-top: 30px; /* Espace au-dessus pour le séparer des sliders */
-    margin-bottom: 20px; /* Espace en dessous avant le bouton "Retour" */
-    text-align: left;
-    background-color: rgba(0, 0, 0, 0.2); /* Fond légèrement visible pour le délimiter */
-    padding: 15px;
-    border: 2px solid #5a3d2b; /* Bordure cohérente avec le thème */
-    border-radius: 5px;
-}
-
-/* Style pour le sous-titre "Contrôles" */
-.controls-info h3 {
-    color: #f1c40f; /* Couleur or du thème */
-    margin: 0 0 15px 0; /* Marge en bas uniquement */
-    padding-bottom: 5px;
-    border-bottom: 2px solid #5a3d2b; /* Ligne de séparation */
-    text-align: center;
-}
-
-/* Style pour les paragraphes "Clavier :" et "Mobile :" */
-.controls-info p {
-    margin: 10px 0 5px 0;
-}
-
-/* Style pour les listes <ul> */
-.controls-info ul {
-    list-style: none; /* Supprime les puces par défaut */
-    padding-left: 10px;
-}
-
-/* Style pour chaque élément de la liste <li> */
-.controls-info li {
-    padding: 4px 0;
-}
-
-.survival-text {
-    margin-top: 40px; /* Espace par rapport à l'affichage de l'or */
-    font-size: 14px;
-    color: #ffffff; /* Une couleur un peu plus discrète */
-    font-style: italic;
-    text-shadow: 1px 1px 1px #000;
-    animation: breathing-effect 1s ease-in-out infinite;
-
-}
-
-/* Afficher les contrôles uniquement sur les écrans tactiles/petits */
-/* (hover: none) and (pointer: coarse) est une bonne heuristique pour les appareils tactiles */
+/* Affiche les contrôles tactiles uniquement en jeu ET sur un appareil tactile */
 @media (hover: none) and (pointer: coarse) {
     body.in-game #mobile-controls {
-        display: block;
+        display: flex; /* Utilise flex pour conserver la disposition en colonne */
     }
 }
 
+/*
+========================================
+--- Media Queries (Responsive) ---
+========================================
+*/
 @media (max-width: 670px) {
+    body { font-size: 14px; }
+    #main-menu h1 { animation: none; }
+    .modal h2 { font-size: 20px; }
+    button { font-size: 14px; padding: 12px 20px; }
+    #stats { font-size: 12px; }
+    .bar-text { font-size: 11px; }
+    #gold-display { font-size: 12px; }
+    #pause-upgrades-list li { font-size: 12px; }
+    .stat-entry { font-size: 12px; }
+}
 
-    /* Taille de police globale pour les petits écrans */
-    body {
-        font-size: 14px;
-    }
-
-    /* Réduction de la taille du titre principal */
-    #main-menu h1 {
-        /* Animation légèrement réduite pour ne pas être trop distrayante */
-        animation: none; 
-    }
-
-     /* Réduction de la taille des titres de modales (Pause, Game Over, etc.) */
-    .modal h2 {
-        font-size: 18px;
-    }
-
-    /* Réduction de la taille des boutons principaux et de leur espacement */
-    #main-menu button,
-    #pause-modal button,
-    #victory-modal button,
-    #options-modal button,
-    #permanent-upgrades-menu button,
-    #reset-confirmation-modal button,
-    #stats-menu button {
-        font-size: 14px;
-        padding: 12px 20px; /* On réduit le padding pour que les boutons soient moins hauts */
-    }
-
-    /* Réduction du texte des statistiques en jeu */
-    #stats {
-        font-size: 12px;
-    }
-
-    /* Réduction du texte sur les barres de vie/XP */
-    .bar-text {
-        font-size: 11px;
-    }
-
-     /* Réduction du texte pour l'or */
-    #gold-display {
-        font-size: 12px;
-    }
-
-    /* Réduction du texte dans le menu pause */
-    #pause-upgrades-list li {
-        font-size: 12px;
-    }
-
-    /* Réduction du texte dans le menu des statistiques */
-    .stat-entry {
-        font-size: 12px;
-    }
+@media (max-width: 480px) {
+    .modal-content { padding: 15px; }
+    #upgrades-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .stats-grid { grid-template-columns: 1fr; }
+    .permanent-upgrade-btn { height: 110px; }
 }
 
 @media (max-width: 350px) {
-
-    /* Titres de modales adaptés */
-    .modal h2 {
-        font-size: 16px;
-    }
-
-    /* Boutons principaux plus compacts */
-    #main-menu button,
-    #pause-modal button,
-    #victory-modal button,
-    #options-modal button,
-    #permanent-upgrades-menu button,
-    #reset-confirmation-modal button,
-    #stats-menu button {
-        font-size: 12px;
-        padding: 10px 15px; /* Padding encore réduit */
-    }
-
-    /* Boutons d'améliorations permanentes plus petits */
-    .permanent-upgrade-btn {
-        font-size: 10px; /* Texte très petit pour tout faire rentrer */
-        height: 120px;   /* Boutons moins hauts */
-        padding: 10px;
-    }
-    .upgrade-cost {
-        font-size: 12px;
-    }
-
-    /* Stats en jeu et or en version minimale */
-    #stats, #gold-display {
-        font-size: 10px;
-    }
-
-    /* Texte sur les barres de vie/XP à sa plus petite taille lisible */
-    .bar-text {
-        font-size: 9px;
-    }
+    .modal h2 { font-size: 18px; }
+    button { font-size: 12px; padding: 10px 15px; }
+    .permanent-upgrade-btn { font-size: 10px; height: 100px; padding: 8px; }
+    .upgrade-cost { font-size: 10px; }
+    #stats, #gold-display { font-size: 10px; }
+    .bar-text { font-size: 9px; }
+    #resetUpgradesButton { top: 5px; right: 5px; font-size: 10px; padding: 4px 8px;}
 }
