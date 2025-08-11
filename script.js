@@ -189,6 +189,13 @@ let projectiles = [], enemies = [], xpGems = [], goldCoins = [], specialPickups 
 let enemySpawnTimer = 0;
 let xpMergeTimer = 0; // Timer pour la fusion des gemmes d'XP
 
+// --- CONTRÔLES MOBILES ---
+let joystickStick, joystickBase;
+let joystickActive = false;
+let joystickTouchId = null;
+let joystickRadius = 0;
+let joystickCenter = { x: 0, y: 0 };
+
 // Propriétés initiales du joueur à utiliser pour la réinitialisation
 const initialPlayerState = {
     x: world.width / 2, y: world.height / 2, w: 70, h: 125, spriteW: 128, spriteH: 160, hitboxOffsetX: -5, hitboxOffsetY: 0,
@@ -1962,6 +1969,89 @@ function menuAnimationLoop() {
     menuAnimationId = requestAnimationFrame(menuAnimationLoop);
 }
 
+// --- NOUVELLE FONCTION POUR LES CONTRÔLES MOBILES ---
+function setupMobileControls() {
+    if (!joystickBase) return; // Ne rien faire si les contrôles n'existent pas
+
+    joystickRadius = joystickBase.offsetWidth / 2;
+
+    const handleTouchStart = (e) => {
+        e.preventDefault();
+        if (joystickTouchId === null) {
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
+            joystickActive = true;
+            const rect = joystickBase.getBoundingClientRect();
+            joystickCenter = {
+                x: rect.left + joystickRadius,
+                y: rect.top + joystickRadius
+            };
+        }
+    };
+
+    const handleTouchMove = (e) => {
+        if (!joystickActive) return;
+        e.preventDefault();
+
+        let touch = null;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                touch = e.changedTouches[i];
+                break;
+            }
+        }
+
+        if (touch) {
+            let dx = touch.clientX - joystickCenter.x;
+            let dy = touch.clientY - joystickCenter.y;
+            const distance = Math.hypot(dx, dy);
+
+            // Limiter le stick à l'intérieur de la base
+            if (distance > joystickRadius) {
+                dx = (dx / distance) * joystickRadius;
+                dy = (dy / distance) * joystickRadius;
+            }
+
+            joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+
+            // Mettre à jour l'état des touches pour le mouvement du joueur
+            const threshold = joystickRadius * 0.2; // Seuil pour activer le mouvement
+            keys['w'] = keys['z'] = dy < -threshold;
+            keys['s'] = dy > threshold;
+            keys['a'] = keys['q'] = dx < -threshold;
+            keys['d'] = dx > threshold;
+        }
+    };
+
+    const handleTouchEnd = (e) => {
+        if (!joystickActive) return;
+
+        let touchEnded = false;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                touchEnded = true;
+                break;
+            }
+        }
+
+        if (touchEnded) {
+            joystickActive = false;
+            joystickTouchId = null;
+            joystickStick.style.transform = 'translate(0, 0)';
+            // Réinitialiser toutes les touches de mouvement
+            keys['w'] = keys['z'] = false;
+            keys['s'] = false;
+            keys['a'] = keys['q'] = false;
+            keys['d'] = false;
+        }
+    };
+
+    joystickBase.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+}
+
 // Fonction d'initialisation du jeu
 function init(){
     document.getElementById('ui-container').innerHTML=`
@@ -2035,6 +2125,10 @@ function init(){
     menuBackgroundCanvas = document.getElementById('menu-background-canvas');
     menuBgCtx = menuBackgroundCanvas.getContext('2d');
     
+    // Références pour le joystick
+    joystickBase = document.getElementById('joystick-base');
+    joystickStick = document.getElementById('joystick-stick');
+    
     canvas.style.display = 'none';
     uiContainer.style.display = 'none';
 
@@ -2057,6 +2151,9 @@ function init(){
 document.addEventListener('DOMContentLoaded', () => {
     // Appelle la fonction d'initialisation pour démarrer le jeu
     init();
+
+    // Mise en place des contrôles mobiles
+    setupMobileControls();
 
     // Animation du titre
     const title = document.querySelector('#main-menu h1');

@@ -9,6 +9,9 @@ body {
     align-items: center;
     height: 100vh;
     overflow: hidden;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10+ */
+    user-select: none; /* Standard syntax */
 }
 
 #game-container {
@@ -559,4 +562,43 @@ canvas {
     color: #f1c40f;
     font-weight: bold;
     float: right;
+}
+
+/* Contrôles pour mobile */
+#mobile-controls {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    z-index: 100;
+    display: none; /* Caché par défaut */
+    user-select: none; /* Empêcher la sélection de texte */
+}
+
+#joystick-base {
+    width: 120px;
+    height: 120px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+#joystick-stick {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    position: absolute;
+    transition: transform 0.05s ease-out; /* Pour un retour en douceur */
+}
+
+/* Afficher les contrôles uniquement sur les écrans tactiles/petits */
+/* (hover: none) and (pointer: coarse) est une bonne heuristique pour les appareils tactiles */
+@media (hover: none) and (pointer: coarse) {
+    #mobile-controls {
+        display: block;
+    }
 }
