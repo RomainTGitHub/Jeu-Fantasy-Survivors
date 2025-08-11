@@ -1260,8 +1260,6 @@ function draw(){
     ctx.save();
     
     // Calcule le coin supérieur gauche pour dessiner le sprite.
-    // Ceci centre visuellement le sprite sur la position logique de la hitbox (player.x, player.y)
-    // puis applique les décalages visuels.
     const spriteDrawX = player.x + (player.w / 2) - (player.spriteW / 2) + player.visualOffsetX;
     const spriteDrawY = player.y + (player.h / 2) - (player.spriteH / 2) + player.visualOffsetY;
 
@@ -1287,8 +1285,6 @@ function draw(){
             ctx.globalAlpha = 0.5;
         }
 
-        // Dessine l'image du sprite en utilisant ses dimensions visuelles (spriteW, spriteH),
-        // et non les dimensions de la hitbox (w, h).
         ctx.drawImage(sprite, sourceX, 0, frameWidth, frameHeight, spriteDrawX, spriteDrawY, player.spriteW, player.spriteH);
         
         // Réinitialise la transparence.
@@ -1462,7 +1458,7 @@ function startGame() {
         backgroundMusic.play().catch(error => {
             console.warn("La lecture automatique a été empêchée. L'utilisateur doit d'abord interagir avec le document.", error);
         });
-        toggleMusicButton.textContent = "Musique: ON";
+        toggleMusicButton.innerHTML = '🎵<span class="btn-text">Musique: ON</span>';
     }
     updateStatusIcons();
     animationFrameId = requestAnimationFrame(gameLoop);
@@ -1509,7 +1505,6 @@ function quitGame() {
 
     pauseModal.style.display = 'none';
     mainMenu.style.display = 'flex';
-    mainMenuGoldUI.style.display = 'block';
     soundControlsUI.style.display = 'flex';
     
     loadGameData(); 
@@ -1624,8 +1619,8 @@ function loadGameData() {
 
         if (musicVolumeSlider) musicVolumeSlider.value = musicVolume;
         if (sfxVolumeSlider) sfxVolumeSlider.value = sfxVolume;
-        if (toggleMusicButton) toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
-        if (toggleSfxButton) toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+        if (toggleMusicButton) toggleMusicButton.innerHTML = isMusicOn ? '🎵<span class="btn-text">Musique: ON</span>' : '🔇<span class="btn-text">Musique: OFF</span>';
+        if (toggleSfxButton) toggleSfxButton.innerHTML = areSoundEffectsOn ? '🔊<span class="btn-text">Effets Sonores: ON</span>' : '🔈<span class="btn-text">Effets Sonores: OFF</span>';
 
         if (mainMenu.style.display !== 'none') {
             soundControlsUI.style.display = 'flex';
@@ -1671,6 +1666,7 @@ function getUpgradeCost(upgrade) {
 
 function showUpgradesMenu() {
     mainMenu.style.display = 'none';
+    soundControlsUI.style.display = 'none'; // Cacher les contrôles
     if(menuAnimationId) {
         cancelAnimationFrame(menuAnimationId);
         menuAnimationId = null;
@@ -1682,6 +1678,7 @@ function showUpgradesMenu() {
 
 function hideUpgradesMenu() {
     mainMenu.style.display = 'flex';
+    soundControlsUI.style.display = 'flex'; // Réafficher les contrôles
     permanentUpgradesMenu.style.display = 'none';
     if (!menuAnimationId) {
         menuAnimationLoop();
@@ -1770,6 +1767,7 @@ function resetAllUpgrades() {
 // Fonctions pour le menu des statistiques
 function showStatsMenu() {
     mainMenu.style.display = 'none';
+    soundControlsUI.style.display = 'none'; // Cacher les contrôles
     if(menuAnimationId) {
         cancelAnimationFrame(menuAnimationId);
         menuAnimationId = null;
@@ -1780,6 +1778,7 @@ function showStatsMenu() {
 
 function hideStatsMenu() {
     mainMenu.style.display = 'flex';
+    soundControlsUI.style.display = 'flex'; // Réafficher les contrôles
     statsMenu.style.display = 'none';
     if (!menuAnimationId) {
         menuAnimationLoop();
@@ -1870,14 +1869,14 @@ function toggleMusic() {
     } else {
         backgroundMusic.volume = 0;
     }
-    toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+    toggleMusicButton.innerHTML = isMusicOn ? '🎵<span class="btn-text">Musique: ON</span>' : '🔇<span class="btn-text">Musique: OFF</span>';
     saveGameData();
 }
 
 // Fonction pour basculer les effets sonores
 function toggleSoundEffects() {
     areSoundEffectsOn = !areSoundEffectsOn;
-    toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+    toggleSfxButton.innerHTML = areSoundEffectsOn ? '🔊<span class="btn-text">Effets Sonores: ON</span>' : '🔈<span class="btn-text">Effets Sonores: OFF</span>';
     saveGameData();
 }
 
@@ -1914,14 +1913,14 @@ function updateMusicVolume() {
     musicVolume = parseFloat(musicVolumeSlider.value);
     backgroundMusic.volume = musicVolume;
     isMusicOn = musicVolume > 0;
-    toggleMusicButton.textContent = `Musique: ${isMusicOn ? 'ON' : 'OFF'}`;
+    toggleMusicButton.innerHTML = isMusicOn ? '🎵<span class="btn-text">Musique: ON</span>' : '🔇<span class="btn-text">Musique: OFF</span>';
     saveGameData();
 }
 
 function updateSfxVolume() {
     sfxVolume = parseFloat(sfxVolumeSlider.value);
     areSoundEffectsOn = sfxVolume > 0;
-    toggleSfxButton.textContent = `Effets Sonores: ${areSoundEffectsOn ? 'ON' : 'OFF'}`;
+    toggleSfxButton.innerHTML = areSoundEffectsOn ? '🔊<span class="btn-text">Effets Sonores: ON</span>' : '🔈<span class="btn-text">Effets Sonores: OFF</span>';
     saveGameData();
 }
 
@@ -2011,7 +2010,7 @@ function init(){
             Or: <span id="gold-count">0</span>
         </div>
     `;
-        gameContainer.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
+    gameContainer.insertAdjacentHTML('beforeend',`<div id="level-up-modal" class="modal"><div class="modal-content"><h2>NIVEAU SUPÉRIEUR !</h2><p>Choisissez une amélioration :</p><div id="upgrade-options"></div></div></div><div id="game-over-modal" class="modal"><div class="modal-content"><h2>GAME OVER</h2><p id="final-score"></p><button onclick="window.location.reload()">Recommencer</button></div></div>`);
 
 
     levelUI=document.getElementById('level');
@@ -2059,11 +2058,9 @@ function init(){
     globalStatsGrid = document.getElementById('global-stats-grid');
     
     menuBackgroundCanvas = document.getElementById('menu-background-canvas');
-    menuBgCtx = menuBackgroundCanvas.getContext('2d');
-    
-    // Références pour le joystick
-    joystickBase = document.getElementById('joystick-base');
-    joystickStick = document.getElementById('joystick-stick');
+    if (menuBackgroundCanvas) {
+        menuBgCtx = menuBackgroundCanvas.getContext('2d');
+    }
     
     canvas.style.display = 'none';
     uiContainer.style.display = 'none';
@@ -2084,9 +2081,7 @@ function init(){
     
 }
 function playButtonClickSound() {
-    // On vérifie si les effets sonores sont activés et si le son existe dans nos assets
     if (areSoundEffectsOn && assets.clickSound) {
-        
         assets.clickSound.volume = sfxVolume;
         assets.clickSound.currentTime = 0;
         assets.clickSound.play();
@@ -2101,23 +2096,16 @@ function setupMobileControls() {
 
     if (!upButton) return;
 
-    // Fonction pour gérer l'appui sur un bouton
-    const handlePress = (key) => {
-        return (e) => {
-            e.preventDefault();
-            keys[key] = true;
-        };
+    const handlePress = (key) => (e) => {
+        e.preventDefault();
+        keys[key] = true;
     };
 
-    // Fonction pour gérer le relâchement d'un bouton
-    const handleRelease = (key) => {
-        return (e) => {
-            e.preventDefault();
-            keys[key] = false;
-        };
+    const handleRelease = (key) => (e) => {
+        e.preventDefault();
+        keys[key] = false;
     };
 
-    // Écouteurs d'événements pour le mouvement avec les touches ZQSD
     upButton.addEventListener('touchstart', handlePress('z'), { passive: false });
     upButton.addEventListener('touchend', handleRelease('z'), { passive: false });
     upButton.addEventListener('touchcancel', handleRelease('z'), { passive: false });
@@ -2138,27 +2126,20 @@ function setupMobileControls() {
     const fullscreenButton = document.getElementById('fullscreenButton');
     const gameContainer = document.getElementById('game-container');
 
-    // On vérifie si l'API Fullscreen est supportée par le navigateur
     if (document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled || document.msFullscreenEnabled) {
-        // Si oui, on affiche le bouton
         fullscreenButton.style.display = 'block';
 
         fullscreenButton.addEventListener('click', () => {
-            // Si on est déjà en plein écran, on quitte
             if (document.fullscreenElement) {
                 document.exitFullscreen();
             } else {
-                // Sinon, on demande le plein écran pour le conteneur du jeu
                 gameContainer.requestFullscreen().catch(err => {
                     alert(`Erreur lors du passage en plein écran : ${err.message} (${err.name})`);
                 });
             }
         });
 
-        // Très important : on écoute les changements d'état du plein écran
-        // pour redimensionner le canvas correctement.
         document.addEventListener('fullscreenchange', () => {
-            // On attend un court instant pour que le navigateur ait fini sa transition
             setTimeout(() => {
                 resizeCanvas();
             }, 100);
@@ -2168,41 +2149,34 @@ function setupMobileControls() {
 
 // Attendre que le DOM soit chargé pour ajouter les écouteurs d'événements
 document.addEventListener('DOMContentLoaded', () => {
-    // Appelle la fonction d'initialisation pour démarrer le jeu
     init();
 
-    // Mise en place des contrôles mobiles
     setupMobileControls();
 
-    // Animation du titre
     const title = document.querySelector('#main-menu h1');
-const text = title.textContent.trim(); // "Fantasy Survivors"
-const words = text.split(' '); // ["Fantasy", "Survivors"]
-title.innerHTML = ''; // On vide le H1
+    const text = title.textContent.trim();
+    const words = text.split(' ');
+    title.innerHTML = '';
 
-let letterIndex = 0;
-words.forEach((word, wordIndex) => {
-    // Crée un conteneur pour le mot
-    const wordWrapper = document.createElement('span');
-    wordWrapper.style.display = 'inline-block'; // Garde les lettres du mot ensemble
+    let letterIndex = 0;
+    words.forEach((word, wordIndex) => {
+        const wordWrapper = document.createElement('span');
+        wordWrapper.style.display = 'inline-block';
 
-    // Crée les spans pour chaque lettre du mot
-    for (let i = 0; i < word.length; i++) {
-        const letterSpan = document.createElement('span');
-        letterSpan.textContent = word[i];
-        letterSpan.style.setProperty('--i', letterIndex++);
-        wordWrapper.appendChild(letterSpan);
-    }
+        for (let i = 0; i < word.length; i++) {
+            const letterSpan = document.createElement('span');
+            letterSpan.textContent = word[i];
+            letterSpan.style.setProperty('--i', letterIndex++);
+            wordWrapper.appendChild(letterSpan);
+        }
 
-    // Ajoute le mot complet (avec ses lettres) au titre
-    title.appendChild(wordWrapper);
+        title.appendChild(wordWrapper);
 
-    // Ajoute un espace après chaque mot, sauf le dernier
-    if (wordIndex < words.length - 1) {
-        title.appendChild(document.createTextNode(' '));
-        letterIndex++; // On compte l'espace pour l'index de l'animation
-    }
-});
+        if (wordIndex < words.length - 1) {
+            title.appendChild(document.createTextNode(' '));
+            letterIndex++;
+        }
+    });
 
     document.getElementById('startGameButton').addEventListener('click', startGame);
     document.getElementById('upgradesMenuButton').addEventListener('click', showUpgradesMenu);
@@ -2232,24 +2206,15 @@ words.forEach((word, wordIndex) => {
         console.log("La lecture automatique de la musique de fond a été empêchée.");
         showCustomAutoplayAlert();
         isMusicOn = false;
-        toggleMusicButton.textContent = "Musique: OFF";
+        toggleMusicButton.innerHTML = '🔇<span class="btn-text">Musique: OFF</span>';
     });
     
-
     gameContainer.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     });
 
-// Sélectionne TOUS les éléments <button> de la page
     const allButtons = document.querySelectorAll('button');
-
-    // Ajoute un écouteur d'événement 'click' sur chaque bouton trouvé
     allButtons.forEach(button => {
         button.addEventListener('click', playButtonClickSound);
     });
-    
 });
-
-
-
-

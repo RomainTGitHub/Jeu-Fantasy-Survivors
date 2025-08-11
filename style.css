@@ -216,6 +216,7 @@ button:disabled {
     text-shadow: 4px 4px 0px #e67e22;
     z-index: 2;
     position: relative;
+    text-align: center; /* Assure le centrage horizontal */
 }
 
 #main-menu h1 span {
@@ -541,17 +542,21 @@ button:disabled {
 /* Contrôles du son et plein écran */
 #sound-controls {
     position: absolute;
-    top: 10px;
     right: 10px;
     z-index: 30;
     display: flex; /* Affiché par défaut */
-    flex-direction: column;
-    gap: 7px;
 }
 
 #sound-controls button {
     padding: 10px 15px;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-text {
+    margin-left: 8px;
 }
 
 #fullscreenButton {
@@ -627,6 +632,23 @@ button:disabled {
     #gold-display { font-size: 12px; }
     #pause-upgrades-list li { font-size: 12px; }
     .stat-entry { font-size: 12px; }
+
+    /* Styles pour les contrôles du son en mode mobile */
+    #sound-controls {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    #sound-controls button {
+        font-size: 20px; /* Taille de l'icône */
+        padding: 8px;
+        min-width: 40px;
+        height: 40px;
+    }
+
+    #sound-controls button .btn-text {
+        display: none; /* Cache le texte */
+    }
 }
 
 @media (max-width: 480px) {
