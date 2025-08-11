@@ -22,7 +22,9 @@ body {
     width: clamp(320px, 90vw, 1400px);
     height: clamp(240px, 85vh, 900px);
     overflow: hidden;
+    /* Assurez-vous que le contenu ne déborde pas */
     transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out;
+    /* Transition douce pour le retour de dégâts */
 }
 
 #game-container.damage-overlay {
@@ -542,9 +544,12 @@ button:disabled {
 /* Contrôles du son et plein écran */
 #sound-controls {
     position: absolute;
+    top: 10px;
     right: 10px;
     z-index: 30;
     display: flex; /* Affiché par défaut */
+    flex-direction: column;
+    gap: 7px;
 }
 
 #sound-controls button {
@@ -597,7 +602,7 @@ button:disabled {
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     color: white;
-    font-family: 'Press Start 2P', cursive;
+    font-family: 'Press Start 2P', cursive, sans-serif; /* Ajout de sans-serif en fallback */
     font-size: 24px;
     display: flex;
     justify-content: center;
