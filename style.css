@@ -684,7 +684,7 @@ canvas {
 /* Afficher les contrôles uniquement sur les écrans tactiles/petits */
 /* (hover: none) and (pointer: coarse) est une bonne heuristique pour les appareils tactiles */
 @media (hover: none) and (pointer: coarse) {
-    #mobile-controls {
+    body.in-game #mobile-controls {
         display: block;
     }
 }

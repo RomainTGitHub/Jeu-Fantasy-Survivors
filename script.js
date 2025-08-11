@@ -821,6 +821,7 @@ function updatePlayerInvincibility() {
 
 // Gère la fin de partie
 async function gameOver(){
+    document.body.classList.remove('in-game');
     gameState.running=false;
     finalScoreUI.textContent=`Survécu ${Math.floor(gameState.gameTime/1000)}s, ${gameState.killCount} kills.`;
     gameOverModal.style.display='flex';
@@ -835,6 +836,7 @@ async function gameOver(){
 
 // Fonction de victoire
 async function gameVictory() {
+    document.body.classList.remove('in-game');
     gameState.running = false;
     victoryModal.style.display = 'flex';
     saveGameData();
@@ -1438,6 +1440,7 @@ function gameLoop(timestamp){
 
 // Fonction pour démarrer le jeu
 function startGame() {
+    document.body.classList.add('in-game');
     mainMenu.style.display = 'none';
     canvas.style.display = 'block';
     uiContainer.style.display = 'block';
@@ -1488,6 +1491,7 @@ function resumeGame() {
 
 // Fonction pour quitter le jeu et retourner au menu principal
 function quitGame() {
+    document.body.classList.remove('in-game');
     saveGameData();
 
     canvas.style.display = 'none';
